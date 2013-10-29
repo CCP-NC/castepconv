@@ -216,9 +216,15 @@ def strip_paramfile(plines):
     
     for l in plines:
         
-        if "task" in l.split()[0]:
+        l_split = l.strip().split()
+        
+        # Skip empty lines
+        
+        if len(l_split) == 0:
             continue
-        if "cut_off_energy" in l.split()[0]:
+        if "task" in l_split[0]:
+            continue
+        if "cut_off_energy" in l_split[0]:
             continue
         
         stripped.append(l)

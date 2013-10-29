@@ -124,7 +124,7 @@ def parse_convfile(cfile):
             #Skip empty lines
             continue
         else:
-            cline = cline.split(':')
+            cline = cline.lower().split(':')
         if (len(cline) < 2):
             raise ConvError("Bad formatting in .conv file at line " + str(i))
         if (cline[0] in str_par_names):
@@ -155,9 +155,11 @@ def strip_cellfile(clines):
         
         if not l[0] == '#':
             
+            l = l.lower()
+            
             if to_read_abc:
                 l_split = l.strip().split()
-                if l_split[0].lower() in length_units:
+                if l_split[0] in length_units:
                     u = length_units[l_split[0]]
                 else: 
                     try:
@@ -167,7 +169,7 @@ def strip_cellfile(clines):
                     to_read_abc = False
             if to_read_cart:
                 l_split = l.strip().split()
-                if l_split[0].lower() in length_units:
+                if l_split[0] in length_units:
                     u = length_units[l_split[0]]
                 else:
                     try:
@@ -182,22 +184,22 @@ def strip_cellfile(clines):
                 continue
             if "kpoints_mp_spacing" in l:
                 continue
-            if "%BLOCK" in l:
-                if "KPOINT_LIST" in l:
+            if "%block" in l:
+                if "kpoint_list" in l:
                     to_strip = True
                     continue
-                elif "LATTICE_ABC" in l:
+                elif "lattice_abc" in l:
                     if abc is not None:
                         raise CellError('Duplicated LATTICE_* block in .cell file')
                     to_read_abc = True
                     abc = [-1.0, -1.0, -1.0]
-                elif "LATTICE_CART" in l:
+                elif "lattice_cart" in l:
                     if abc is not None:
                         raise CellError('Duplicated LATTICE_* block in .cell file')
                     to_read_cart = True
                     abc = [-1.0, -1.0, -1.0]
             if to_strip:
-                if "%ENDBLOCK" in l:
+                if "%endblock" in l:
                     to_strip = False
                 continue
         
@@ -219,7 +221,7 @@ def strip_paramfile(plines):
     
     for l in plines:
         
-        l_split = l.strip().split()
+        l_split = l.strip().lower().split()
         
         # Skip empty lines
         
@@ -248,13 +250,15 @@ def displace_cell_atoms(clines, abc, d):
         
         if not l[0] == '#':
             
+            l = l.lower()
+            
             if to_displ_abs or to_displ_frac:
                 l_split = l.strip().split()
-                if "%ENDBLOCK" in l:
+                if "%endblock" in l:
                     to_displ_abs = False
                     to_displ_frac = False
-                elif to_displ_abs and l_split[0].lower() in length_units:
-                    u = length_units[l_split[0].lower()]
+                elif to_displ_abs and l_split[0] in length_units:
+                    u = length_units[l_split[0]]
                     l = "ang\n"
                 else:
                     if len(l_split) != 4:
@@ -270,11 +274,11 @@ def displace_cell_atoms(clines, abc, d):
                             l = l_split[0] + '\t' + str(xyz[0]+fac*d/abc[0]) + '\t' + str(xyz[1]+fac*d/abc[1]) + '\t' + str(xyz[2]+fac*d/abc[2]) + '\n'
                     except ValueError:
                         raise CellError('Bad formatting in .cell file POSITION_* block')
-            if "%BLOCK" in l:
-                if "POSITIONS_ABS" in l:
+            if "%block" in l:
+                if "positions_abs" in l:
                     to_displ_abs = True
                     u = 1.0
-                elif "POSITIONS_FRAC" in l:
+                elif "positions_frac" in l:
                     to_displ_frac = True
         
         clines_displ.append(l)

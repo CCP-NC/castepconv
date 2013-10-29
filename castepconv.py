@@ -128,11 +128,11 @@ def parse_convfile(cfile):
         if (len(cline) < 2):
             raise ConvError("Bad formatting in .conv file at line " + str(i))
         if (cline[0] in str_par_names):
-            str_par_vals[str_par_names[cline[0]]] = cline[1].lower().strip()
+            str_par_vals[str_par_names[cline[0].strip()]] = cline[1].strip()
         elif (cline[0] in float_par_names):
-            float_par_vals[float_par_names[cline[0]]] = float(cline[1])
+            float_par_vals[float_par_names[cline[0].strip()]] = float(cline[1])
         elif (cline[0] in int_par_names):
-            int_par_vals[int_par_names[cline[0]]] = int(cline[1])
+            int_par_vals[int_par_names[cline[0].strip()]] = int(cline[1])
         else:
             raise ConvError("Unrecognized option in .conv file at line " + str(i))
 

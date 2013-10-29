@@ -897,7 +897,7 @@ if (str_par_vals["ctsk"] in ("all", "output")):
             delta_nrg = nrg
             
             if i == len(cutnrg[1:])-1:
-                print "Impossible to give a convergence estimate for cutoff based on energy. Extending the range is suggested"
+                print "Unable to converge cutoff with energy within given range.  Try increasing cutoff_max in " + seedname + ".conv"
         
     if len(cutfor) < 2:
         print "Impossible to give a convergence estimate with a single force point"
@@ -918,7 +918,7 @@ if (str_par_vals["ctsk"] in ("all", "output")):
             delta_for = force
             
             if i == len(cutfor[1:])-1:
-                print "Impossible to give a convergence estimate for cutoff based on forces. Extending the range is suggested"
+                print "Unable to converge cutoff with forces within given range.  Try increasing cutoff_max in " + seedname + ".conv"
     
     
     if len(kpnnrg) < 2:
@@ -937,7 +937,7 @@ if (str_par_vals["ctsk"] in ("all", "output")):
             delta_nrg = nrg
             
             if i == len(kpnnrg[1:])-1:
-                print "Impossible to give a convergence estimate for kpoints based on energy. Extending the range is suggested"
+                print "Unable to converge k-point grid with energy within given range.  Try increasing kpoint_n_max in " + seedname + ".conv"
         
     if len(kpnfor) < 2:
         print "Impossible to give a convergence estimate with a single force point"
@@ -958,7 +958,7 @@ if (str_par_vals["ctsk"] in ("all", "output")):
             delta_for = force
             
             if i == len(kpnfor[1:])-1:
-                print "Impossible to give a convergence estimate for cutoff based on forces. Extending the range is suggested"
+                print "Unable to converge k-point grid with forces within given range.  Try increasing kpoint_n_max in " + seedname + ".conv"
     
     
     if str_par_vals["outp"] == "gnuplot":

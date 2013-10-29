@@ -427,6 +427,8 @@ if (str_par_vals['ctsk'] in ("input", "inputrun", "all")):
     kpn_n = int(math.ceil(int_par_vals["kpnmax"]-int_par_vals["kpnmin"])/int_par_vals["kpnstep"])+1
     kpnrange = [tuple([(int_par_vals["kpnmin"] + i * int_par_vals["kpnstep"]) * e for e in kpn_base]) for i in range(0, kpn_n)]
     
+    ovwrite_files = False
+    
     if str_par_vals["rmode"] == "parallel":
         
         print "Creating folders for parallel convergence run"
@@ -439,13 +441,15 @@ if (str_par_vals['ctsk'] in ("input", "inputrun", "all")):
             
             print "Creating folder " + foldname
             
-            if not os.path.exists(foldname): 
+            if not os.path.exists(foldname) or ovwrite_files: 
                 os.makedirs(foldname)
             else:
                 to_del = raw_input("Warning: folder " + foldname + " already exists. \
-                \nSome files migh be overwritten. Continue (y/N)?")
-                if to_del != 'y':
+                \nSome files might be overwritten. Continue (y/N/y-all)?")
+                if to_del == 'N':
                     sys.exit("Aborting")
+                elif to_del == 'y-all':
+                    ovwrite_files = True
             
             icell = open(foldname + r'/' + foldname + '.cell', 'w')
             iparam = open(foldname + r'/' + foldname + '.param', 'w')
@@ -473,13 +477,15 @@ if (str_par_vals['ctsk'] in ("input", "inputrun", "all")):
             
             print "Creating folder " + foldname
             
-            if not os.path.exists(foldname): 
+            if not os.path.exists(foldname) or ovwrite_files: 
                 os.makedirs(foldname)
             else:
                 to_del = raw_input("Warning: folder " + foldname + " already exists. \
-                \nSome files migh be overwritten. Continue (y/N)?")
-                if to_del != 'y':
+                \nSome files might be overwritten. Continue (y/N/y-all)?")
+                if to_del == 'N':
                     sys.exit("Aborting")
+                elif to_del == 'y-all':
+                    ovwrite_files = True
                         
             icell = open(foldname + r'/' + foldname + '.cell', 'w')
             iparam = open(foldname + r'/' + foldname + '.param', 'w')
@@ -508,13 +514,15 @@ if (str_par_vals['ctsk'] in ("input", "inputrun", "all")):
         
         print "Creating folder " + foldname + " for serial convergence run"
         
-        if not os.path.exists(foldname): 
+        if not os.path.exists(foldname) or ovwrite_files: 
             os.makedirs(foldname)
         else:
             to_del = raw_input("Warning: folder " + foldname + " already exists. \
-            \nSome files migh be overwritten or deleted. Continue (y/N)?")
-            if to_del != 'y':
+            \nSome files might be overwritten. Continue (y/N/y-all)?")
+            if to_del == 'N':
                 sys.exit("Aborting")
+            elif to_del == 'y-all':
+                ovwrite_files = True
                 
         conv_tab_file.write("cutoff:\t")
         

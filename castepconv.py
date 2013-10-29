@@ -203,6 +203,9 @@ def strip_cellfile(clines):
         
         stripped.append(l)
         
+    if abc is None:
+        raise CellError('.cell file does not contain a LATTICE_* block')
+    
     max_e = max(abc)
     kbase = tuple([int(max_e/x) for x in abc])
     

@@ -45,14 +45,18 @@ float_par_names = {
 "cutoff_min": "cutmin",
 "cutoff_max": "cutmax",
 "cutoff_step": "cutstep",
-"displace_atoms": "displ"
+"displace_atoms": "displ",
+"final_energy_delta": "nrgtol",
+"forces_delta": "fortol",
 }
 
 float_par_vals = { 
 "cutmin" : 400.0,           # eV
 "cutmax" : 800.0,           # eV
 "cutstep": 100.0,           # eV
-"displ"  : 0.0              # Ang
+"displ"  : 0.0,             # Ang
+"nrgtol" : 0.01,            # eV/atom
+"fortol" : 0.001            # eV/(Ang*atom)
 }
 
 int_par_names = {
@@ -77,6 +81,7 @@ kpnrange = None
 
 abc_len = None
 kpn_base = (1, 1, 1)
+atom_n = 0
 
 __CASTEP_HEADER__     = "+-------------------------------------------------+"
 __CASTEP_TIME__       = "Total time          ="
@@ -85,9 +90,6 @@ __CASTEP_KPOINTS__    = "MP grid size for SCF calculation is"
 __CASTEP_ENERGY__     = "Final energy, E             ="
 __CASTEP_FORCES__     = "***************** Symmetrised Forces *****************"
 __CASTEP_FORCES_END__ = "*                                                    *"
-
-__FINAL_NRG_DELTA__    = 0.1    #eV, the tolerance accepted on energy convergence
-__FORCES_DELTA__   = 0.01   #eV/A, the tolerance accepted on forces (absolute)
 
 # Just a useful snippet to return a kpoint grid from a 3-ple
 
@@ -155,10 +157,10 @@ def strip_cellfile(clines):
         
         if not l[0] == '#':
             
-            l = l.lower()
+            l_low = l.lower()
             
             if to_read_abc:
-                l_split = l.strip().split()
+                l_split = l_low.strip().split()
                 if l_split[0] in length_units:
                     u = length_units[l_split[0]]
                 else: 
@@ -168,7 +170,7 @@ def strip_cellfile(clines):
                         raise CellError('Bad formatting in .cell file LATTICE_ABC block')
                     to_read_abc = False
             if to_read_cart:
-                l_split = l.strip().split()
+                l_split = l_low.strip().split()
                 if l_split[0] in length_units:
                     u = length_units[l_split[0]]
                 else:
@@ -180,26 +182,26 @@ def strip_cellfile(clines):
                     except ValueError:
                         raise CellError('Bad formatting in .cell file LATTICE_ABC block')
                     to_read_cart = (min(abc) < 0.0)
-            if "kpoints_mp_grid" in l:
+            if "kpoints_mp_grid" in l_low:
                 continue
-            if "kpoints_mp_spacing" in l:
+            if "kpoints_mp_spacing" in l_low:
                 continue
-            if "%block" in l:
-                if "kpoint_list" in l:
+            if "%block" in l_low:
+                if "kpoint_list" in l_low:
                     to_strip = True
                     continue
-                elif "lattice_abc" in l:
+                elif "lattice_abc" in l_low:
                     if abc is not None:
                         raise CellError('Duplicated LATTICE_* block in .cell file')
                     to_read_abc = True
                     abc = [-1.0, -1.0, -1.0]
-                elif "lattice_cart" in l:
+                elif "lattice_cart" in l_low:
                     if abc is not None:
                         raise CellError('Duplicated LATTICE_* block in .cell file')
                     to_read_cart = True
                     abc = [-1.0, -1.0, -1.0]
             if to_strip:
-                if "%endblock" in l:
+                if "%endblock" in l_low:
                     to_strip = False
                 continue
         
@@ -240,6 +242,8 @@ def strip_paramfile(plines):
 
 def displace_cell_atoms(clines, abc, d):
     
+    a_n = 0
+    
     to_displ_abs = False
     to_displ_frac = False
     u = None
@@ -250,20 +254,21 @@ def displace_cell_atoms(clines, abc, d):
         
         if not l[0] == '#':
             
-            l = l.lower()
+            l_low = l.lower()
             
             if to_displ_abs or to_displ_frac:
                 l_split = l.strip().split()
-                if "%endblock" in l:
+                if "%endblock" in l_low:
                     to_displ_abs = False
                     to_displ_frac = False
-                elif to_displ_abs and l_split[0] in length_units:
-                    u = length_units[l_split[0]]
+                elif to_displ_abs and l_split[0].lower() in length_units:
+                    u = length_units[l_split[0].lower()]
                     l = "ang\n"
                 else:
                     if len(l_split) != 4:
                         raise CellError('Bad formatting in .cell file POSITION_* block')
                     try:
+                        a_n += 1
                         xyz = [float(x) for x in l_split[1:]]
                         # The displacement is in alternated directions, since otherwise you'd still get an equilibrium structure
                         # Won't work for single atom unit cells. This needs fixing. It might also break if there are symmetries in the system.
@@ -274,16 +279,16 @@ def displace_cell_atoms(clines, abc, d):
                             l = l_split[0] + '\t' + str(xyz[0]+fac*d/abc[0]) + '\t' + str(xyz[1]+fac*d/abc[1]) + '\t' + str(xyz[2]+fac*d/abc[2]) + '\n'
                     except ValueError:
                         raise CellError('Bad formatting in .cell file POSITION_* block')
-            if "%block" in l:
-                if "positions_abs" in l:
+            if "%block" in l_low:
+                if "positions_abs" in l_low:
                     to_displ_abs = True
                     u = 1.0
-                elif "positions_frac" in l:
+                elif "positions_frac" in l_low:
                     to_displ_frac = True
         
         clines_displ.append(l)
     
-    return clines_displ
+    return a_n, clines_displ
 
 # Waits for a running job until it's finished
 
@@ -407,14 +412,15 @@ if (str_par_vals['ctsk'] in ("input", "inputrun", "all")):
     
     if float_par_vals["displ"] > 0.0:
         print "Displacing atoms in .cell file of " + str(float_par_vals["displ"]) + " Angstroms"
-        try:
-            stripped_cell = displace_cell_atoms(stripped_cell, abc_len, float_par_vals["displ"])
-        except CellError as CE:
-            sys.exit("ERROR - " + str(CE))
-    
+    try:
+        atom_n, stripped_cell = displace_cell_atoms(stripped_cell, abc_len, float_par_vals["displ"])
+    except CellError as CE:
+        sys.exit("ERROR - " + str(CE))
+        
     # Open a .conv_tab file to keep track of the created files and folders. Will be read if output is done as a separate operation
     
     conv_tab_file = open(seedname + ".conv_tab", 'w')
+    conv_tab_file.write("atom_n:\t" + str(atom_n) + "\n")
     
     if (float_par_vals["cutmin"] <= 0.0 or float_par_vals["cutstep"] <= 0.0 or float_par_vals["cutmax"] < float_par_vals["cutmin"]):
         sys.exit("ERROR - Invalid cutoff range defined in .conv file")
@@ -441,9 +447,9 @@ if (str_par_vals['ctsk'] in ("input", "inputrun", "all")):
             
             print "Creating folder " + foldname
             
-            if not os.path.exists(foldname) or ovwrite_files: 
+            if not os.path.exists(foldname): 
                 os.makedirs(foldname)
-            else:
+            elif not ovwrite_files:
                 to_del = raw_input("Warning: folder " + foldname + " already exists. \
                 \nSome files might be overwritten. Continue (y/N/y-all)?")
                 if to_del == 'N':
@@ -477,9 +483,9 @@ if (str_par_vals['ctsk'] in ("input", "inputrun", "all")):
             
             print "Creating folder " + foldname
             
-            if not os.path.exists(foldname) or ovwrite_files: 
+            if not os.path.exists(foldname): 
                 os.makedirs(foldname)
-            else:
+            elif not ovwrite_files:
                 to_del = raw_input("Warning: folder " + foldname + " already exists. \
                 \nSome files might be overwritten. Continue (y/N/y-all)?")
                 if to_del == 'N':
@@ -514,9 +520,9 @@ if (str_par_vals['ctsk'] in ("input", "inputrun", "all")):
         
         print "Creating folder " + foldname + " for serial convergence run"
         
-        if not os.path.exists(foldname) or ovwrite_files: 
+        if not os.path.exists(foldname): 
             os.makedirs(foldname)
-        else:
+        elif not ovwrite_files:
             to_del = raw_input("Warning: folder " + foldname + " already exists. \
             \nSome files might be overwritten. Continue (y/N/y-all)?")
             if to_del == 'N':
@@ -716,22 +722,41 @@ if (str_par_vals["ctsk"] in ("all", "output")):
             ctab_file = open(seedname + ".conv_tab", 'r').readlines()
             if len(ctab_file) == 2:
                 try:
-                    cutline = ctab_file[0].split(':')[1].split('eV')
-                    kpnline = ctab_file[1].split(':')[1].split('|')
-                    if (cutline is not None and kpnline is not None):
+                    anline  = ctab_file[0].split(':')[1]
+                    cutline = ctab_file[1].split(':')[1].split('eV')
+                    kpnline = ctab_file[2].split(':')[1].split('|')
+                    if (anline is not None and cutline is not None and kpnline is not None):
+                        atom_n = int(anline)
                         cutrange = [float(cut.strip()) for cut in cutline[:-1]]
                         kpnrange = [tuple([int(k) for k in kpn.strip().split()]) for kpn in kpnline[:-1]]
                 except IndexError:
                     cutline = None
                     kpnline = None
-                    
+    
     cutnrg = []
     cutfor = []
     kpnnrg = []
     kpnfor = []
     
-    # Try opening the various .castep files and collect energy and forces
+    # If atom_n hasn't been estimated yet (output job, no conv_tab file) calculate it from any .cell file
     
+    if atom_n == 0:
+        jobname = seedname + "_cut_1_kpn_1"
+        
+        if (str_par_vals["rmode"] == "serial"):
+            foldname = seedname + "_conv"
+        else:
+            foldname = jobname
+                
+        filepath = foldname + r'/' + jobname + '.cell'
+        
+        if not os.path.isfile(filepath):
+            sys.exit("ERROR - File " + filepath + " not found. Please check that input files have been generated properly")
+        
+        atom_n, dummy = displace_cell_atoms(open(filepath).readlines(), (1.0, 1.0, 1.0), 0.0)
+    
+    
+    # Try opening the various .castep files and collect energy and forces
     
     for i, cut in enumerate(cutrange):
         
@@ -741,7 +766,7 @@ if (str_par_vals["ctsk"] in ("all", "output")):
             foldname = seedname + "_conv"
         else:
             foldname = jobname
-        
+                
         filepath = foldname + r'/' + jobname + '.castep'
         
         if not os.path.isfile(filepath):
@@ -756,6 +781,7 @@ if (str_par_vals["ctsk"] in ("all", "output")):
         
         
         start_l = rindex_cont(castepfile, __CASTEP_HEADER__)
+        
         
         for j, l in enumerate(castepfile[start_l:]):
             
@@ -853,7 +879,7 @@ if (str_par_vals["ctsk"] in ("all", "output")):
     
     # Make an estimate of the best values
         
-    print "Convergence results:\n"
+    print "\nConvergence results:"
     
     if len(cutnrg) < 2:
         print "Impossible to give a convergence estimate with a single cutoff point"
@@ -864,8 +890,8 @@ if (str_par_vals["ctsk"] in ("all", "output")):
         for i, nrg in enumerate(cutnrg[1:]):
             
             delta_nrg = abs(nrg - delta_nrg)
-            if delta_nrg < __FINAL_NRG_DELTA__:
-                print "Based on energy, minimum cutoff suggested is " + str(cutrange[i]) + " eV"
+            if delta_nrg/atom_n < float_par_vals["nrgtol"]:
+                print "Based on converging total energy to " + str(float_par_vals["nrgtol"]) + " eV per atom, minimum cutoff suggested is " + str(cutrange[i]) + " eV"
                 break
             
             delta_nrg = nrg
@@ -873,14 +899,26 @@ if (str_par_vals["ctsk"] in ("all", "output")):
             if i == len(cutnrg[1:])-1:
                 print "Impossible to give a convergence estimate for cutoff based on energy. Extending the range is suggested"
         
-    for i, force in enumerate(cutfor):
+    if len(cutfor) < 2:
+        print "Impossible to give a convergence estimate with a single force point"
+    else:
         
-        if force < __FORCES_DELTA__:
-            print "Based on forces, minimum cutoff suggested is " + str(cutrange[i]) + " eV"
-            break
+        delta_for = cutfor[0]
         
-        if i == len(cutfor)-1:
-            print "Impossible to give a convergence estimate for cutoff based on forces. Extending the range is suggested"
+        if delta_for/atom_n < float_par_vals["fortol"]:
+            print "WARNING - Forces are lower than " + str(float_par_vals["fortol"]) + " eV/Ang per atom. A different atom displacement might be necessary to get meaningful results"
+                    
+        for i, force in enumerate(cutfor[1:]):
+            
+            delta_for = abs(force - delta_for)
+            if delta_for/atom_n < float_par_vals["fortol"]:
+                print "Based on converging total forces to " + str(float_par_vals["fortol"]) + " eV/Ang per atom, minimum cutoff suggested is " + str(cutrange[i]) + " eV"
+                break
+            
+            delta_for = force
+            
+            if i == len(cutfor[1:])-1:
+                print "Impossible to give a convergence estimate for cutoff based on forces. Extending the range is suggested"
     
     
     if len(kpnnrg) < 2:
@@ -892,8 +930,8 @@ if (str_par_vals["ctsk"] in ("all", "output")):
         for i, nrg in enumerate(kpnnrg[1:]):
             
             delta_nrg = abs(nrg - delta_nrg)
-            if delta_nrg < __FINAL_NRG_DELTA__:
-                print "Based on energy, minimum kpoint grid suggested is " + kgrid(kpnrange[i])
+            if delta_nrg/atom_n < float_par_vals["nrgtol"]:
+                print "Based on converging total energy to " + str(float_par_vals["nrgtol"]) + " eV per atom, minimum kpoint grid suggested is " + kgrid(kpnrange[i])
                 break
             
             delta_nrg = nrg
@@ -901,14 +939,27 @@ if (str_par_vals["ctsk"] in ("all", "output")):
             if i == len(kpnnrg[1:])-1:
                 print "Impossible to give a convergence estimate for kpoints based on energy. Extending the range is suggested"
         
-    for i, force in enumerate(kpnfor):
+    if len(kpnfor) < 2:
+        print "Impossible to give a convergence estimate with a single force point"
+    else:
         
-        if force < __FORCES_DELTA__:
-            print "Based on forces, minimum kpoint grid suggested is " + kgrid(kpnrange[i])
-            break
+        delta_for = kpnfor[0]
         
-        if i == len(kpnfor)-1:
-            print "Impossible to give a convergence estimate for kpoints based on forces. Extending the range is suggested"
+        if delta_for/atom_n < float_par_vals["fortol"]:
+            print "WARNING - Forces are lower than " + str(float_par_vals["fortol"]) + " eV/Ang per atom. A different atom displacement might be necessary to get meaningful results"
+                    
+        for i, force in enumerate(kpnfor[1:]):
+            
+            delta_for = abs(force - delta_for)
+            if delta_for/atom_n < float_par_vals["fortol"]:
+                print "Based on converging total forces to " + str(float_par_vals["fortol"]) + " eV/Ang per atom, minimum kpoint grid suggested is " + kgrid(kpnrange[i])
+                break
+            
+            delta_for = force
+            
+            if i == len(kpnfor[1:])-1:
+                print "Impossible to give a convergence estimate for cutoff based on forces. Extending the range is suggested"
+    
     
     if str_par_vals["outp"] == "gnuplot":
         

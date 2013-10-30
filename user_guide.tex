@@ -71,7 +71,7 @@ The accepted parameter names are listed in the subsections below.
 \textbf{displace\_atoms}: Displacement in Angstroms to introduce in atom positions - necessary when the cell is equilibrated and it is not possible to converge forces because they are zero. Default is 0.0 Ang.\newline
 \textit{Legal values}: Any float\newline
 
-\textbf{final\_energy\_delta}: Tolerance on final energy for the estimate of convergence. Default is 0.00002 eV/atom.\newline
+\textbf{final\_energy\_delta}: Tolerance on final energy for the estimate of convergence. Default is 0.00001 eV/atom.\newline
 \textit{Legal values}: Any positive float\newline
 
 \textbf{forces\_delta}: Tolerance on maximum force for the estimate of convergence. See above. Default is 0.05 eV/Ang.\newline
@@ -94,6 +94,9 @@ The accepted parameter names are listed in the subsections below.
 \subsection{Boolean parameters}
 
 \textbf{converge\_stress}: Apply calculation of stresses to the simulations and then estimate convergence on stresses as well as energy and forces.\newline
+\textit{Legal values}: Anything. The word ``true'', regardless of the case, means the stresses are calculated. Anything else will be interpreted as \textbf{False}.\newline
+
+\textbf{reuse\_calcs}: If results from a previous convergence are present, recycle them when possible. This requires the .conv\_tab file from the previous calculation to be unaltered.\newline
 \textit{Legal values}: Anything. The word ``true'', regardless of the case, means the stresses are calculated. Anything else will be interpreted as \textbf{False}.\newline
 
 \section{Output}

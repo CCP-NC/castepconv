@@ -34,10 +34,10 @@ length_units = {'ang':1.0, 'm':1.0e10, 'cm':1.0e8, 'nm':10.0, 'bohr':0.529, 'a0'
 # Parameters from CONV files - names and values
 
 str_par_names = {
-"convergence_task": "ctsk",
-"running_mode": "rmode",
-"output_type":  "outp",
-"running_command": "rcmd",
+"convergence_task"  : "ctsk",
+"running_mode"      : "rmode",
+"output_type"       :  "outp",
+"running_command"   : "rcmd",
 }
 
 str_par_vals = {
@@ -48,13 +48,13 @@ str_par_vals = {
 }
 
 float_par_names = {
-"cutoff_min": "cutmin",
-"cutoff_max": "cutmax",
-"cutoff_step": "cutstep",
-"displace_atoms": "displ",
+"cutoff_min"        : "cutmin",
+"cutoff_max"        : "cutmax",
+"cutoff_step"       : "cutstep",
+"displace_atoms"    : "displ",
 "final_energy_delta": "nrgtol",
-"forces_delta": "fortol",
-"stresses_delta": "strtol"
+"forces_delta"      : "fortol",
+"stresses_delta"    : "strtol"
 }
 
 float_par_vals = { 
@@ -62,14 +62,14 @@ float_par_vals = {
 "cutmax" : 800.0,           # eV
 "cutstep": 100.0,           # eV
 "displ"  : 0.0,             # Ang
-"nrgtol" : 0.2000E-04,      # eV/atom
+"nrgtol" : 0.1000E-04,      # eV/atom
 "fortol" : 0.5000E-01,      # eV/Ang
 "strtol" : 0.1              # GPa
 }
 
 int_par_names = {
-"kpoint_n_min": "kpnmin",
-"kpoint_n_max": "kpnmax",
+"kpoint_n_min" : "kpnmin",
+"kpoint_n_max" : "kpnmax",
 "kpoint_n_step": "kpnstep",
 }
 
@@ -80,11 +80,13 @@ int_par_vals = {
 }
 
 bool_par_names = {
-"converge_stress" : "cnvstr"
+"converge_stress" : "cnvstr",
+"reuse_calcs"     : "rcalc"
 }
 
 bool_par_vals = {
-"cnvstr" : False
+"cnvstr" : False,
+"rcalc"  : False
 }
 
 # CELL and PARAM files
@@ -158,7 +160,31 @@ def parse_convfile(cfile):
             bool_par_vals[bool_par_names[par_name]] = (cline[1].lower().strip() == "true")
         else:
             raise ConvError("Unrecognized option in .conv file at line " + str(i))
-        
+
+# Parse .conv_tab file to generate cutoff and k points ranges
+
+def parse_conv_tab_file(cfile):
+    
+    cutrange = []
+    kpnrange = []
+    
+    cfile.seek(0)
+    clines = cfile.readlines()
+    
+    if len(clines) == 2:
+        try:
+            cutline = clines[0].split(':')[1].split('eV')
+            kpnline = clines[1].split(':')[1].split('|')
+            if (cutline is not None and kpnline is not None):
+                cutrange = [float(cut.strip()) for cut in cutline[:-1]]
+                kpnrange = [tuple([int(k) for k in kpn.strip().split()]) for kpn in kpnline[:-1]]
+        except IndexError:
+            return [], []
+    else:
+        return [], []
+    
+    return cutrange, kpnrange
+
 # Strip .cell file from unnecessary lines to get only the ones we care for (i.e. remove all reference to kpoints, we're going to put those in ourselves)
 # Also read cell parameters and construct the proper kpn_base
 
@@ -253,6 +279,8 @@ def strip_paramfile(plines):
         if "task" in l_split[0]:
             continue
         if "cut_off_energy" in l_split[0]:
+            continue
+        if "calculate_stress" in l_split[0]:
             continue
         
         stripped.append(l)
@@ -458,7 +486,16 @@ if (str_par_vals['ctsk'] in ("input", "inputrun", "all")):
             stripped_cell = displace_cell_atoms(stripped_cell, abc_len, float_par_vals["displ"])
         except CellError as CE:
             sys.exit("ERROR - " + str(CE))
-            
+    
+    # If reuse of previous calculations is required, try to open the old .conv_tab file
+    
+    if bool_par_vals["rcalc"] and os.path.isfile(seedname + ".conv_tab"):
+        print "Reusing results from previous convergence calculations"
+        old_cutrange, old_kpnrange = parse_conv_tab_file(open(seedname + ".conv_tab", 'r'))
+    else:
+        old_cutrange = []
+        old_kpnrange = []
+    
     # Open a .conv_tab file to keep track of the created files and folders. Will be read if output is done as a separate operation
     
     conv_tab_file = open(seedname + ".conv_tab", 'w')
@@ -474,6 +511,14 @@ if (str_par_vals['ctsk'] in ("input", "inputrun", "all")):
     kpn_n = int(math.ceil(int_par_vals["kpnmax"]-int_par_vals["kpnmin"])/int_par_vals["kpnstep"])+1
     kpnrange = [tuple([(int_par_vals["kpnmin"] + i * int_par_vals["kpnstep"]) * e for e in kpn_base]) for i in range(0, kpn_n)]
     
+    # Avoid non repeating calculation which would have different 'lowest' value for cutoff/k points
+    
+    if len(old_cutrange) > 0 and old_cutrange[0] != cutrange[0]:
+        old_kpnrange = []
+    
+    if len(old_kpnrange) > 0 and old_kpnrange[0] != kpnrange[0]:
+        old_cutrange = []
+    
     ovwrite_files = False
     
     if str_par_vals["rmode"] == "parallel":
@@ -483,6 +528,13 @@ if (str_par_vals['ctsk'] in ("input", "inputrun", "all")):
         conv_tab_file.write("cutoff:\t")
         
         for i, cut in enumerate(cutrange):
+            
+            conv_tab_file.write(str(cut) + " eV\t")
+            
+            # Skip if we already have it
+            
+            if cut in old_cutrange:
+                continue
             
             foldname = seedname + "_cut_" + str(i+1) + "_kpn_1"
             
@@ -510,15 +562,20 @@ if (str_par_vals['ctsk'] in ("input", "inputrun", "all")):
             iparam.write("cut_off_energy:\t" + str(cut) + " eV\n")
             for l in stripped_param: 
                 iparam.write(l)
+            if bool_par_vals["cnvstr"]:
+                iparam.write("calculate_stress:\ttrue")
             iparam.close()
-            
-            conv_tab_file.write(str(cut) + " eV\t")
-        
+                    
         conv_tab_file.write("\n")
             
         conv_tab_file.write("kpoint_n:\t" + kgrid(kpnrange[0]) + "\t|\t")
         
         for i, kpn in enumerate(kpnrange[1:]):
+            
+            conv_tab_file.write(kgrid(kpn) + "\t|\t")
+            
+            if kpn in old_kpnrange:
+                continue
             
             foldname = seedname + "_cut_1_kpn_" + str(i+2)
             
@@ -546,9 +603,10 @@ if (str_par_vals['ctsk'] in ("input", "inputrun", "all")):
             iparam.write("cut_off_energy:\t" + str(cutrange[0]) + " eV\n")
             for l in stripped_param: 
                 iparam.write(l)
+            if bool_par_vals["cnvstr"]:
+                iparam.write("calculate_stress:\ttrue")
             iparam.close()
             
-            conv_tab_file.write(kgrid(kpn) + "\t|\t")
         
         conv_tab_file.close()
         
@@ -577,6 +635,11 @@ if (str_par_vals['ctsk'] in ("input", "inputrun", "all")):
         
         for i, cut in enumerate(cutrange):
             
+            conv_tab_file.write(str(cut) + " eV\t")
+            
+            if cut in old_cutrange:
+                continue
+            
             jobname = seedname + "_cut_" + str(i+1) + "_kpn_1"
             
             print "Creating files for job " + jobname
@@ -595,17 +658,23 @@ if (str_par_vals['ctsk'] in ("input", "inputrun", "all")):
                 iparam.write(l)
             if prev_jobname is not None:
                 iparam.write("reuse:\t" + prev_jobname + ".check")
+            if bool_par_vals["cnvstr"]:
+                iparam.write("calculate_stress:\ttrue")
             iparam.close()
             
             prev_jobname = jobname
             
-            conv_tab_file.write(str(cut) + " eV\t")
         
         conv_tab_file.write("\n")
             
         conv_tab_file.write("kpoint_n:\t" + kgrid(kpnrange[0]) + "\t|\t")
         
         for i, kpn in enumerate(kpnrange[1:]):
+            
+            conv_tab_file.write(kgrid(kpn) + "\t|\t")
+            
+            if kpn in old_kpnrange:
+                continue
             
             jobname = seedname + "_cut_1_kpn_" + str(i+2)
             
@@ -630,7 +699,6 @@ if (str_par_vals['ctsk'] in ("input", "inputrun", "all")):
             
             prev_jobname = jobname
             
-            conv_tab_file.write(kgrid(kpn) + "\t|\t")
         
         conv_tab_file.close()
     else:
@@ -646,6 +714,9 @@ if (str_par_vals["ctsk"] in ("all", "inputrun")):
         print "Running parallel convergence jobs"
         
         for i, cut in enumerate(cutrange):
+            
+            if cut in old_cutrange:
+                continue
             
             foldname = seedname + "_cut_" + str(i+1) + "_kpn_1"
             
@@ -665,6 +736,9 @@ if (str_par_vals["ctsk"] in ("all", "inputrun")):
             os.chdir("..")
                     
         for i, kpn in enumerate(kpnrange[1:]):
+            
+            if kpn in old_kpnrange:
+                continue
             
             foldname = seedname + "_cut_1_kpn_" + str(i+2)
             
@@ -706,6 +780,9 @@ if (str_par_vals["ctsk"] in ("all", "inputrun")):
         
         for i, cut in enumerate(cutrange):
             
+            if cut in old_cutrange:
+                continue
+            
             jobname = seedname + "_cut_" + str(i+1) + "_kpn_1"
             
             print "Running job with " + str(cut) + " eV cutoff"
@@ -724,6 +801,9 @@ if (str_par_vals["ctsk"] in ("all", "inputrun")):
             jobfinish_wait(foldname, jobname)
                     
         for i, kpn in enumerate(kpnrange[1:]):
+            
+            if kpn in old_kpnrange:
+                continue
             
             jobname = seedname + "_cut_1_kpn_" + str(i+2)
             
@@ -760,17 +840,7 @@ if (str_par_vals["ctsk"] in ("all", "output")):
         kpnrange = [tuple([(int_par_vals["kpnmin"] + i * int_par_vals["kpnstep"]) * e for e in kpn_base]) for i in range(0, kpn_n)]
         
         if os.path.isfile(seedname + ".conv_tab"):
-            ctab_file = open(seedname + ".conv_tab", 'r').readlines()
-            if len(ctab_file) == 2:
-                try:
-                    cutline = ctab_file[0].split(':')[1].split('eV')
-                    kpnline = ctab_file[1].split(':')[1].split('|')
-                    if (cutline is not None and kpnline is not None):
-                        cutrange = [float(cut.strip()) for cut in cutline[:-1]]
-                        kpnrange = [tuple([int(k) for k in kpn.strip().split()]) for kpn in kpnline[:-1]]
-                except IndexError:
-                    cutline = None
-                    kpnline = None
+            cutrange, kpnrange = parse_conv_tab_file(open(seedname + ".conv_tab", 'r'))
     
     calc_str = bool_par_vals["cnvstr"]
     

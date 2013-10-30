@@ -1,0 +1,120 @@
+\documentclass[10pt]{article}
+\usepackage{listings}
+
+\title{CASTEP convergence automation tool 1.0 User Guide}
+\author{Simone Sturniolo}
+
+\begin{document}
+\maketitle
+
+\section{Introduction}
+
+The CASTEP convergence automation tool (CASTEPconv) is a Python script designed to automate the process of calculating the convergence of energy and forces in DFT calculations with CASTEP, as a function of the cutoff energy and the number of kpoints used. It works with Python 2.6 or higher. Given a .cell file, the script is able to create a set of folders containing input files for the required simulations, run the jobs, and process the output to produce tabulated ASCII data files and graphs. A .param file can be introduced as well to define any additional options for the DFT calculation, while a .conv file can be used to provide further options for the automated convergence calculation itself.
+
+\section{Installation}
+
+To install the script on Linux or CygWin just open a terminal, navigate to the folder containing the files, and type:
+
+\begin{lstlisting}[language=Bash]
+ user@machine:~$ sudo python setup.py install
+\end{lstlisting}
+
+Enter your password as prompted and the script will be installed and available as a command.
+
+\section{Usage}
+
+CASTEPconv requires only a .cell file to be present in the folder when it's used. Considering a file named ``\textless \textit{seedname}\textgreater.cell'', where \textless \textit{seedname}\textgreater represents the name of the job, the syntax to run the convergence job is simply
+
+\begin{lstlisting}[language=Bash]
+ user@machine:~$ castepconv.py <seedname>
+\end{lstlisting}
+
+while in the folder where the file is kept. If one wants the convergence DFT simulations to have additional parameters (e.g. redefine the convergence criteria for SCF iterations, add dispersion correction etc.), a \textless \textit{seedname}\textgreater.param file can be added in the same folder with these options. To control the convergence job itself, instead, a new file, \textless \textit{seedname}\textgreater.conv, is needed.
+
+\section{Convergence parameters}
+
+The syntax of the .conv file is similar to the one of the CASTEP .param file:
+
+\begin{lstlisting}
+ <parameter name 1>:    <parameter value 1>
+ <parameter name 2>:    <parameter value 2>
+ ...
+\end{lstlisting}
+
+The accepted parameter names are listed in the subsections below.
+
+\subsection{String parameters}
+
+\textbf{convergence\_task}: describes the task that is required from the convergence script. This can be INPUT (creation of input files and folders), INPUTRUN (same as INPUT, plus actually runs the jobs), OUTPUT (processes some already finished calculations and creates output files) and ALL (does all of the previous things, waiting for the jobs to finish before processing the output). Default is INPUT.\newline
+\textit{Legal values}: INPUT, INPUTRUN, OUTPUT, ALL\newline
+
+\textbf{running\_mode}: describes the mode in which the calculations should be ran. If PARALLEL, all calculations will be launched at the same time (ideal for job submission on a cluster). If SERIAL, the program will wait for one calculation to finish before the next one begins (and reuse the .check file from the previous calculation as a starting point). In the latter case, all files will be created in a single folder. Default is PARALLEL.\newline
+\textit{Legal values}: PARALLEL, SERIAL\newline
+
+\textbf{output\_type}: plotting program for which an output script should be created. For now only GNUPLOT is supported. Default is GNUPLOT.\newline
+\textit{Legal values}: GNUPLOT\newline
+
+\textbf{running\_command}: command line that should be used to run jobs. This should be expressed by replacing the name of the job with the generic token \textless \textit{seedname}\textgreater. Default is \textit{castep \textless seedname\textgreater -dryrun}.\newline
+\textit{Legal values}: any string containing the token \textless \textit{seedname}\textgreater\newline
+
+\subsection{Float parameters}
+
+\textbf{cutoff\_min}: Minimum value for the cutoff range explored in eV. Default is 400.0 eV.\newline
+\textit{Legal values}: Any positive float.\newline
+
+\textbf{cutoff\_max}: Maximum value for the cutoff range explored in eV. Default is 800.0 eV.\newline
+\textit{Legal values}: Any positive float greater than cutoff\_min.\newline
+
+\textbf{cutoff\_step}: Step between the values of the cutoff range explored in eV. Default is 100.0 eV.\newline
+\textit{Legal values}: Any positive float.\newline
+
+\textbf{displace\_atoms}: Displacement in Angstroms to introduce in atom positions - necessary when the cell is equilibrated and it is not possible to converge forces because they are zero. Default is 0.0 Ang.\newline
+\textit{Legal values}: Any float\newline
+
+\textbf{final\_energy\_delta}: Tolerance on final energy for the estimate of convergence. The system will be deemed converged in cutoff/kpoints when increasing the respective value won't cause a change in final energy greater than this value (normalized per atom). Default is 0.01 eV/atom.\newline
+\textit{Legal values}: Any positive float\newline
+
+\textbf{forces\_delta}: Tolerance on forces for the estimate of convergence. See above. Default is 0.001 eV/Ang.\newline
+\textit{Legal values}: Any positive float\newline
+
+\textbf{stresses\_delta}: Tolerance on stresses for the estimate of convergence. See above. Default is 0.01 GPa.\newline
+\textit{Legal values}: Any positive float\newline
+
+\subsection{Integer parameters}
+
+\textbf{kpoint\_n\_min}: Minimum value for the k-point range explored. This applies to the shortest side of the kpoint\_mp\_grid: depending on the size of the other cell parameters, there might be proportionally more k-points along other sides. Default is 1.\newline
+\textit{Legal values}: Any positive integer.\newline
+
+\textbf{kpoint\_n\_max}: Maximum value for the k-point range explored. Default is 4.\newline
+\textit{Legal values}: Any positive integer greater than kpoint\_n\_min.\newline
+
+\textbf{kpoint\_n\_step}: Step between the values of the k-point range explored. Default is 1.\newline
+\textit{Legal values}: Any positive integer.\newline
+
+\subsection{Boolean parameters}
+
+\textbf{converge\_stress}: Apply calculation of stresses to the simulations and then estimate convergence on stresses as well as energy and forces.\newline
+\textit{Legal values}: Anything. The word ``true'', regardless of the case, means the stresses are calculated. Anything else will be interpreted as False.\newline
+
+\section{Output}
+
+When the calculations are over, CASTEPconv will have produced the following files:
+
+\textbf{\textless \textit{seedname}\textgreater.conv\_tab}: this file is created during the INPUT phase of the run (when folders and input files for the calculations are created) and sums up the values used for cutoff and the kpoint grids employed in the various files. This is just useful as a memo, and mostly used to resume analysis of previously ran calculations (by using the OUTPUT convergence\_task) - if it's not present, the ranges will be recalculated from the .conv file.
+
+\textbf{\textless \textit{seedname}\textgreater\_cut\_conv.dat}: generated in the OUTPUT phase of the run, will contain a tabulated ASCII of cutoff values (in eV), final energies (in eV) and total forces (in eV/Ang) for the various calculations ran. The total forces will be calculated as:
+
+\begin{equation}
+ F = \sum_i^{atoms}|\mathbf{f}_i|
+\end{equation}
+
+where $\mathbf{f}_i$ is the force applied on the atom $i$.
+
+\textbf{\textless \textit{seedname}\textgreater\_kpn\_conv.dat}: generated in the OUTPUT phase of the run, it is similar to the above, except that it expresses its quantities as a function of the total number of kpoints in the grid.
+
+\textbf{\textless \textit{seedname}\textgreater\_conv.\textless variable extension\textgreater}: this file is the script meant for generation of graphic output. By default it will be a Gnuplot script (extension .gp). When other forms of output will be supported, choosing the appropriate value for the output\_type option will replace it with a different format.
+
+
+
+\end{document}
+

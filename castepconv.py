@@ -931,6 +931,8 @@ if (str_par_vals["ctsk"] in ("all", "output")):
     
     if len(cutnrg) < 2:
         print "Impossible to give a convergence estimate with a single cutoff point"
+    elif float_par_vals["nrgtol"] <= 0.0:
+        print "Impossible to give a convergence estimate with a null or negative value for final_energy_delta"        
     else:
         
         delta_nrg = cutnrg[0]
@@ -949,6 +951,8 @@ if (str_par_vals["ctsk"] in ("all", "output")):
         
     if len(cutfor) < 2:
         print "Impossible to give a convergence estimate with a single force point"
+    elif float_par_vals["fortol"] <= 0.0:
+        print "Impossible to give a convergence estimate with a null or negative value for forces_delta"        
     else:
         
         delta_for = cutfor[0]
@@ -971,6 +975,8 @@ if (str_par_vals["ctsk"] in ("all", "output")):
     if bool_par_vals["cnvstr"]:
         if len(cutstr) < 2:
             print "Impossible to give a convergence estimate with a single stresses point"
+        elif float_par_vals["strtol"] <= 0.0:
+            print "Impossible to give a convergence estimate with a null or negative value for stresses_delta"        
         else:
             
             delta_str = cutstr[0]
@@ -992,6 +998,8 @@ if (str_par_vals["ctsk"] in ("all", "output")):
     
     if len(kpnnrg) < 2:
         print "Impossible to give a convergence estimate with a single cutoff point"
+    elif float_par_vals["nrgtol"] <= 0.0:
+        print "Impossible to give a convergence estimate with a null or negative value for final_energy_delta"        
     else:
         
         delta_nrg = kpnnrg[0]
@@ -1010,6 +1018,8 @@ if (str_par_vals["ctsk"] in ("all", "output")):
         
     if len(kpnfor) < 2:
         print "Impossible to give a convergence estimate with a single force point"
+    elif float_par_vals["fortol"] <= 0.0:
+        print "Impossible to give a convergence estimate with a null or negative value for forces_delta"        
     else:
         
         delta_for = kpnfor[0]
@@ -1032,6 +1042,8 @@ if (str_par_vals["ctsk"] in ("all", "output")):
     if bool_par_vals["cnvstr"]:
         if len(kpnstr) < 2:
             print "Impossible to give a convergence estimate with a single force point"
+        elif float_par_vals["strtol"] <= 0.0:
+            print "Impossible to give a convergence estimate with a null or negative value for stresses_delta"        
         else:
             
             delta_str = kpnstr[0]

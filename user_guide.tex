@@ -71,13 +71,13 @@ The accepted parameter names are listed in the subsections below.
 \textbf{displace\_atoms}: Displacement in Angstroms to introduce in atom positions - necessary when the cell is equilibrated and it is not possible to converge forces because they are zero. Default is 0.0 Ang.\newline
 \textit{Legal values}: Any float\newline
 
-\textbf{final\_energy\_delta}: Tolerance on final energy for the estimate of convergence. The system will be deemed converged in cutoff/kpoints when increasing the respective value won't cause a change in final energy greater than this value (normalized per atom). Default is 0.01 eV/atom.\newline
+\textbf{final\_energy\_delta}: Tolerance on final energy for the estimate of convergence. Default is 0.00002 eV/atom.\newline
 \textit{Legal values}: Any positive float\newline
 
-\textbf{forces\_delta}: Tolerance on forces for the estimate of convergence. See above. Default is 0.001 eV/Ang.\newline
+\textbf{forces\_delta}: Tolerance on maximum force for the estimate of convergence. See above. Default is 0.05 eV/Ang.\newline
 \textit{Legal values}: Any positive float\newline
 
-\textbf{stresses\_delta}: Tolerance on stresses for the estimate of convergence. See above. Default is 0.01 GPa.\newline
+\textbf{stresses\_delta}: Tolerance on maximum stress for the estimate of convergence. See above. Default is 0.1 GPa.\newline
 \textit{Legal values}: Any positive float\newline
 
 \subsection{Integer parameters}
@@ -94,7 +94,7 @@ The accepted parameter names are listed in the subsections below.
 \subsection{Boolean parameters}
 
 \textbf{converge\_stress}: Apply calculation of stresses to the simulations and then estimate convergence on stresses as well as energy and forces.\newline
-\textit{Legal values}: Anything. The word ``true'', regardless of the case, means the stresses are calculated. Anything else will be interpreted as False.\newline
+\textit{Legal values}: Anything. The word ``true'', regardless of the case, means the stresses are calculated. Anything else will be interpreted as \textbf{False}.\newline
 
 \section{Output}
 
@@ -102,19 +102,15 @@ When the calculations are over, CASTEPconv will have produced the following file
 
 \textbf{\textless \textit{seedname}\textgreater.conv\_tab}: this file is created during the INPUT phase of the run (when folders and input files for the calculations are created) and sums up the values used for cutoff and the kpoint grids employed in the various files. This is just useful as a memo, and mostly used to resume analysis of previously ran calculations (by using the OUTPUT convergence\_task) - if it's not present, the ranges will be recalculated from the .conv file.
 
-\textbf{\textless \textit{seedname}\textgreater\_cut\_conv.dat}: generated in the OUTPUT phase of the run, will contain a tabulated ASCII of cutoff values (in eV), final energies (in eV) and total forces (in eV/Ang) for the various calculations ran. The total forces will be calculated as:
+\textbf{\textless \textit{seedname}\textgreater\_cut\_conv.dat}: generated in the OUTPUT phase of the run, will contain a tabulated ASCII of cutoff values (in eV), final energies (in eV) and maximum forces (in eV/Ang) for the various calculations ran. The maximum force is the highest modulus $|\mathbf{f}_i|$ between the forces acting on all atoms $i$ in the system. If \textbf{converge\_stress} has been set to \textbf{True}, a fourth column will contain the value of the maximum stress component acting on the system.
 
-\begin{equation}
- F = \sum_i^{atoms}|\mathbf{f}_i|
-\end{equation}
-
-where $\mathbf{f}_i$ is the force applied on the atom $i$.
+where $\sigma_{ij}$ is the generic element of the stress tensor.
 
 \textbf{\textless \textit{seedname}\textgreater\_kpn\_conv.dat}: generated in the OUTPUT phase of the run, it is similar to the above, except that it expresses its quantities as a function of the total number of kpoints in the grid.
 
 \textbf{\textless \textit{seedname}\textgreater\_conv.\textless variable extension\textgreater}: this file is the script meant for generation of graphic output. By default it will be a Gnuplot script (extension .gp). When other forms of output will be supported, choosing the appropriate value for the output\_type option will replace it with a different format.
 
-
+Besides this, CASTEPconv produces a bit of textual output to suggest which minimum values of cutoff and k-point grid might be the best. This is done by taking the difference between final energy, maximum force, and if required maximum stress, for successive values and comparing it with a tolerance which, by default, is equal to the tolerance assumed in CASTEP calculations on the same quantities. It should be kept to mind that this is only a rule of thumb method, and that it needs to be considered only as an indication - by no means this is meant to be always the correct answer. Different simulations will also require different convergence criteria. Whenever no convergence is found, or the values examined are too small to be sure of their reliability, a warning message is issued.
 
 \end{document}
 

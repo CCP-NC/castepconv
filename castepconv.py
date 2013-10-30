@@ -62,9 +62,9 @@ float_par_vals = {
 "cutmax" : 800.0,           # eV
 "cutstep": 100.0,           # eV
 "displ"  : 0.0,             # Ang
-"nrgtol" : 0.01,            # eV/atom
-"fortol" : 0.001,           # eV/Ang
-"strtol" : 0.01             # GPa
+"nrgtol" : 0.2000E-04,      # eV/atom
+"fortol" : 0.5000E-01,      # eV/Ang
+"strtol" : 0.1              # GPa
 }
 
 int_par_names = {
@@ -362,17 +362,20 @@ def parse_stresses(cfile):
     
     global __CASTEP_STRESSES_END__
     
-    tot_stress = 0.0
+    max_stress = 0.0
     
     for l in cfile[6:]:
         
         if __CASTEP_STRESSES_END__ in l:
-            return tot_stress/3.0
+            return max_stress
         
         try:
-            tot_stress += math.sqrt(sum([float(x)**2.0 for x in l.split()[2:5]]))
+            cur_stress += math.sqrt(sum([float(x)**2.0 for x in l.split()[2:5]]))
         except ValueError:
             pass
+        
+        if cur_stress > max_stress:
+            max_stress = cur_stress
     
     raise CastepError("Corrupted stresses block")
 
@@ -982,13 +985,13 @@ if (str_par_vals["ctsk"] in ("all", "output")):
             delta_str = cutstr[0]
             
             if delta_str < float_par_vals["strtol"]:
-                print "WARNING - Total stresses are lower than " + str(float_par_vals["strtol"]) + " GPa. A different atom displacement might be necessary to get meaningful results"
+                print "WARNING - Maximum stress is lower than " + str(float_par_vals["strtol"]) + " GPa. A different atom displacement might be necessary to get meaningful results"
                         
             for i, stress in enumerate(cutstr[1:]):
                 
                 delta_str = abs(stress - delta_str)
                 if delta_str < float_par_vals["strtol"]:
-                    print "Based on converging total stresses to " + str(float_par_vals["fortol"]) + " GPa, minimum cutoff suggested is " + str(cutrange[i]) + " eV"
+                    print "Based on converging maximum stress to " + str(float_par_vals["fortol"]) + " GPa, minimum cutoff suggested is " + str(cutrange[i]) + " eV"
                     break
                 
                 delta_str = stress
@@ -1049,13 +1052,13 @@ if (str_par_vals["ctsk"] in ("all", "output")):
             delta_str = kpnstr[0]
             
             if delta_str < float_par_vals["strtol"]:
-                print "WARNING - Total stresses are lower than " + str(float_par_vals["strtol"]) + " GPa. A different atom displacement might be necessary to get meaningful results"
+                print "WARNING - Maximum stress is lower than " + str(float_par_vals["strtol"]) + " GPa. A different atom displacement might be necessary to get meaningful results"
                         
             for i, stress in enumerate(kpnstr[1:]):
                 
                 delta_str = abs(stress - delta_str)
                 if delta_str < float_par_vals["strtol"]:
-                    print "Based on converging total stresses to " + str(float_par_vals["strtol"]) + " GPa, minimum kpoint grid suggested is " + kgrid(kpnrange[i])
+                    print "Based on converging maximum stress to " + str(float_par_vals["strtol"]) + " GPa, minimum kpoint grid suggested is " + kgrid(kpnrange[i])
                     break
                 
                 delta_str = stress

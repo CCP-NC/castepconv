@@ -400,7 +400,7 @@ if job_convfile is not None:
     try:
         parse_convfile(job_convfile)
     except ConvError as CE:
-        sys.exit(str(CE))
+        sys.exit("ERROR - " + str(CE))
 
 #    CELL and PARAM files need to be opened only if the task is not OUTPUT
 
@@ -1037,14 +1037,14 @@ if (str_par_vals["ctsk"] in ("all", "output")):
             if delta_str < float_par_vals["strtol"]:
                 print "WARNING - Total stresses are lower than " + str(float_par_vals["strtol"]) + " GPa. A different atom displacement might be necessary to get meaningful results"
                         
-            for i, force in enumerate(kpnstr[1:]):
+            for i, stress in enumerate(kpnstr[1:]):
                 
                 delta_str = abs(stress - delta_str)
                 if delta_str < float_par_vals["strtol"]:
                     print "Based on converging total stresses to " + str(float_par_vals["strtol"]) + " GPa, minimum kpoint grid suggested is " + kgrid(kpnrange[i])
                     break
                 
-                delta_str = stresses
+                delta_str = stress
                 
                 if i == len(kpnstr[1:])-1:
                     print "Unable to converge k-point grid with stresses within given range.  Try increasing kpoint_n_max in " + seedname + ".conv"

@@ -847,6 +847,8 @@ if (str_par_vals["ctsk"] in ("all", "output")):
     
     kpnnrg.append(cutnrg[0])
     kpnfor.append(cutfor[0])
+    if calc_str:
+        kpnstr.append(cutstr[0])
     
     for i, kpn in enumerate(kpnrange[1:]):
         
@@ -912,13 +914,13 @@ if (str_par_vals["ctsk"] in ("all", "output")):
     cutfile = open(seedname + "_cut_conv.dat", 'w')
     kpnfile = open(seedname + "_kpn_conv.dat", 'w')
     
-    cutfile.write("Cutoff (eV)\tEnergy (eV)\tForces (eV/A)\n")
-    kpnfile.write("kpoints (tot)\tEnergy (eV)\tForces (eV/A)\n")
+    cutfile.write("Cutoff (eV)\tEnergy (eV)\tForces (eV/A)" + ("\tTotal stresses (GPa)" if calc_str else "") + "\n")
+    kpnfile.write("kpoints (tot)\tEnergy (eV)\tForces (eV/A)" + ("\tTotal stresses (GPa)" if calc_str else "") + "\n")
     
     for i in range(0, len(cutrange)):
-        cutfile.write(str(cutrange[i]) + '\t\t' + str(cutnrg[i]) + '\t\t' + str(cutfor[i]) + '\n')
+        cutfile.write(str(cutrange[i]) + '\t\t' + str(cutnrg[i]) + '\t\t' + str(cutfor[i]) + ('\t\t' + str(cutstr[i]) if calc_str else '') + '\n')
     for i in range(0, len(kpnrange)):
-        kpnfile.write(str(kpnrange[i][0]*kpnrange[i][1]*kpnrange[i][2]) + '\t\t' + str(kpnnrg[i]) + '\t\t' + str(kpnfor[i]) + '\n')
+        kpnfile.write(str(kpnrange[i][0]*kpnrange[i][1]*kpnrange[i][2]) + '\t\t' + str(kpnnrg[i]) + '\t\t' + str(kpnfor[i]) + ('\t\t' + str(kpnstr[i]) if calc_str else '') + '\n')
     
     cutfile.close()
     kpnfile.close()

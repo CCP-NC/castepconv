@@ -29,7 +29,8 @@ CASTEPconv requires only a .cell file to be present in the folder when it's used
  user@machine:~$ castepconv.py <seedname>
 \end{lstlisting}
 
-while in the folder where the file is kept. If one wants the convergence DFT simulations to have additional parameters (e.g. redefine the convergence criteria for SCF iterations, add dispersion correction etc.), a \textless \textit{seedname}\textgreater.param file can be added in the same folder with these options. To control the convergence job itself, instead, a new file, \textless \textit{seedname}\textgreater.conv, is needed.
+while in the folder where the file is kept. If one wants the convergence DFT simulations to have additional parameters (e.g. redefine the convergence criteria for SCF iterations, add dispersion correction etc.), a \textless \textit{seedname}\textgreater.param file can be added in the same folder with these options. To control the convergence job itself, instead, a new file, \textless \textit{seedname}\textgreater.conv, is needed.\newline
+When running a new convergence job with existing folders from a previous job, ome must remember that \textit{all .castep and .check files will be deleted}, unless the parameter \textbf{reuse\_calcs} has been set to True. If for some reason one wants to keep the old files, they need to be renamed or moved before the new job is launched.
 
 \section{Convergence parameters}
 
@@ -91,13 +92,19 @@ The accepted parameter names are listed in the subsections below.
 \textbf{kpoint\_n\_step}: Step between the values of the k-point range explored. Default is 1.\newline
 \textit{Legal values}: Any positive integer.\newline
 
+\textbf{max\_parallel\_jobs}: Maximum number of parallel jobs to run when in ``parallel'' mode. Ignored in ``serial'' mode. Zero means that there is no limit. Default is 0.\newline
+\textit{Legal values}: Any non negative integer (negative values will be ignored).\newline
+
 \subsection{Boolean parameters}
 
-\textbf{converge\_stress}: Apply calculation of stresses to the simulations and then estimate convergence on stresses as well as energy and forces.\newline
-\textit{Legal values}: Anything. The word ``true'', regardless of the case, means the stresses are calculated. Anything else will be interpreted as \textbf{False}.\newline
+\textbf{converge\_stress}: Apply calculation of stresses to the simulations and then estimate convergence on stresses as well as energy and forces. Default is False.\newline
+\textit{Legal values}: Anything. The word ``true'', regardless of the case, means the stresses are calculated. Anything else will be interpreted as False.\newline
 
-\textbf{reuse\_calcs}: If results from a previous convergence are present, recycle them when possible. This requires the .conv\_tab file from the previous calculation to be unaltered.\newline
-\textit{Legal values}: Anything. The word ``true'', regardless of the case, means the stresses are calculated. Anything else will be interpreted as \textbf{False}.\newline
+\textbf{reuse\_calcs}: If results from a previous convergence are present, recycle them when possible. This requires the .conv\_tab file from the previous calculation to be unaltered. Default is False.\newline
+\textit{Legal values}: Anything. The word ``true'', regardless of the case, means the stresses are calculated. Anything else will be interpreted as False.\newline
+
+\textbf{serial\_reuse}: When a serial convergence job is ran, include the keyword ``reuse'' in the .param files in order to make following calculations reuse the data from .check files from the previous ones. Turning this option off will make the jobs slower but may avoid crashes on some older versions of CASTEP. Default is True.\newline
+\textit{Legal values}: Anything. The word ``true'', regardless of the case, means the stresses are calculated. Anything else will be interpreted as False.\newline
 
 \section{Output}
 
@@ -105,9 +112,7 @@ When the calculations are over, CASTEPconv will have produced the following file
 
 \textbf{\textless \textit{seedname}\textgreater.conv\_tab}: this file is created during the INPUT phase of the run (when folders and input files for the calculations are created) and sums up the values used for cutoff and the kpoint grids employed in the various files. This is just useful as a memo, and mostly used to resume analysis of previously ran calculations (by using the OUTPUT convergence\_task) - if it's not present, the ranges will be recalculated from the .conv file.
 
-\textbf{\textless \textit{seedname}\textgreater\_cut\_conv.dat}: generated in the OUTPUT phase of the run, will contain a tabulated ASCII of cutoff values (in eV), final energies (in eV) and maximum forces (in eV/Ang) for the various calculations ran. The maximum force is the highest modulus $|\mathbf{f}_i|$ between the forces acting on all atoms $i$ in the system. If \textbf{converge\_stress} has been set to \textbf{True}, a fourth column will contain the value of the maximum stress component acting on the system.
-
-where $\sigma_{ij}$ is the generic element of the stress tensor.
+\textbf{\textless \textit{seedname}\textgreater\_cut\_conv.dat}: generated in the OUTPUT phase of the run, will contain a tabulated ASCII of cutoff values (in eV), final energies (in eV) and maximum forces (in eV/Ang) for the various calculations ran. The maximum force is the highest modulus $|\mathbf{f}_i|$ between the forces acting on all atoms $i$ in the system. If \textbf{converge\_stress} has been set to True, a fourth column will contain the value of the maximum stress component acting on the system.
 
 \textbf{\textless \textit{seedname}\textgreater\_kpn\_conv.dat}: generated in the OUTPUT phase of the run, it is similar to the above, except that it expresses its quantities as a function of the total number of kpoints in the grid.
 

@@ -586,10 +586,10 @@ if (str_par_vals['ctsk'] in ("input", "inputrun", "all")):
             elif not ovwrite_files:
                 to_del = raw_input("Warning: folder " + foldname + " already exists. \
                 \nSome files might be overwritten. Continue (y/N/y-all)?")
-                if to_del == 'N':
-                    sys.exit("Aborting")
-                elif to_del == 'y-all':
+                if to_del.lower() == 'y-all':
                     ovwrite_files = True
+                elif to_del.lower() != 'y':
+                    sys.exit("Aborting")
                         
             icell = open(foldname + r'/' + foldname + '.cell', 'w')
             iparam = open(foldname + r'/' + foldname + '.param', 'w')
@@ -624,10 +624,10 @@ if (str_par_vals['ctsk'] in ("input", "inputrun", "all")):
         elif not ovwrite_files:
             to_del = raw_input("Warning: folder " + foldname + " already exists. \
             \nSome files might be overwritten. Continue (y/N/y-all)?")
-            if to_del == 'N':
-                sys.exit("Aborting")
-            elif to_del == 'y-all':
-                ovwrite_files = True
+                if to_del.lower() == 'y-all':
+                    ovwrite_files = True
+                elif to_del.lower() != 'y':
+                    sys.exit("Aborting")
                 
         conv_tab_file.write("cutoff:\t")
         

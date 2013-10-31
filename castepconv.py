@@ -15,6 +15,12 @@ class ConvError(Exception):
     def __str__(self):
         return self.value 
 
+class JobError(Exception):
+    def __init__(self, value):
+        self.value = value
+    def __str__(self):
+        return self.value 
+
 class CellError(Exception):
     def __init__(self, value):
         self.value = value
@@ -68,15 +74,17 @@ float_par_vals = {
 }
 
 int_par_names = {
-"kpoint_n_min" : "kpnmin",
-"kpoint_n_max" : "kpnmax",
-"kpoint_n_step": "kpnstep",
+"kpoint_n_min"      : "kpnmin",
+"kpoint_n_max"      : "kpnmax",
+"kpoint_n_step"     : "kpnstep",
+"max_parallel_jobs" : "maxjobs"
 }
 
 int_par_vals = {
 "kpnmin"  : 1,
 "kpnmax"  : 4,
 "kpnstep" : 1,
+"maxjobs" : 0
 }
 
 bool_par_names = {
@@ -266,6 +274,8 @@ def strip_cellfile(clines):
 
 def strip_paramfile(plines):
     
+    global bool_par_vals
+    
     stripped = []
     
     for l in plines:
@@ -280,7 +290,7 @@ def strip_paramfile(plines):
             continue
         if "cut_off_energy" in l_split[0]:
             continue
-        if "calculate_stress" in l_split[0]:
+        if "calculate_stress" in l_split[0] and bool_par_vals["cnvstr"]:
             continue
         
         stripped.append(l)
@@ -342,27 +352,32 @@ def jobfinish_wait(foldname, jobname):
     
     is_finished = False
     while not is_finished:
-        if not os.path.isfile(foldname + r'/' + jobname + '.castep'):
-            time.sleep(1)
-            continue
-        # In case of errors, abort
-        if os.path.isfile(foldname + r'/' + jobname + '.0001.err'):
-            is_finished = True
-            break
-        cast_file = open(foldname + r'/' + jobname + '.castep', 'r')
-        cast_lines = cast_file.readlines()
-        cast_lines.reverse()
-        cast_file.close()
-        if cast_lines is None:
-            time.sleep(1)
-            continue
-        for l in cast_lines:
-            if __CASTEP_HEADER__ in l:
-                break
-            elif __CASTEP_TIME__ in l:
-                is_finished = True
-                break
+        try:
+            is_finished = jobfinish_check(foldname, jobname)
+        except JobError:
+            pass
         time.sleep(1)
+
+# Checks whether a job is over or not
+
+def jobfinish_check(foldname, jobname):
+    
+    if not os.path.isfile(foldname + r'/' + jobname + '.castep'):
+        return False
+    # In case of errors, abort
+    if os.path.isfile(foldname + r'/' + jobname + '.0001.err'):
+        raise JobError("Job " + jobname + " failed")
+    cast_file = open(foldname + r'/' + jobname + '.castep', 'r')
+    cast_lines = cast_file.readlines()
+    cast_lines.reverse()
+    cast_file.close()
+    if cast_lines is None:
+        return False
+    for l in cast_lines:
+        if __CASTEP_HEADER__ in l:
+            return False
+        elif __CASTEP_TIME__ in l:
+            return True
 
 # Read forces and sum their modules up in .castep file
 
@@ -713,6 +728,8 @@ if (str_par_vals["ctsk"] in ("all", "inputrun")):
         
         print "Running parallel convergence jobs"
         
+        running_jobs = []
+        
         for i, cut in enumerate(cutrange):
             
             if cut in old_cutrange:
@@ -723,6 +740,14 @@ if (str_par_vals["ctsk"] in ("all", "inputrun")):
             print "Running job " + foldname
             
             os.chdir(foldname)
+            
+            if os.path.isfile(foldname + ".castep") or os.path.isfile(foldname + ".check"):
+                print "Removing output files from previous jobs for " + foldname
+                if os.path.isfile(foldname + ".castep"):
+                    os.remove(foldname + ".castep")
+                if os.path.isfile(foldname + ".check"):
+                    os.remove(foldname + ".check")
+            
             cmd_line = str_par_vals["rcmd"].split()
             if not "<seedname>" in cmd_line:
                 cmd_line.append(foldname)
@@ -734,7 +759,14 @@ if (str_par_vals["ctsk"] in ("all", "inputrun")):
             # In fact, if we don't take care to check that all files are closed (see later) they might as well not be and we might end with a crash
             sp.Popen(cmd_line)
             os.chdir("..")
-                    
+            running_jobs.append([foldname, foldname])
+            
+            if int_par_vals["maxjobs"] > 0:
+                while len(running_jobs) >= int_par_vals["maxjobs"]:
+                    for job_ind in range(len(running_jobs)-1, -1, -1):
+                        if jobfinish_check(running_jobs[job_ind][0], running_jobs[job_ind][1]):
+                            del running_jobs[job_ind]
+            
         for i, kpn in enumerate(kpnrange[1:]):
             
             if kpn in old_kpnrange:
@@ -745,6 +777,14 @@ if (str_par_vals["ctsk"] in ("all", "inputrun")):
             print "Running job " + foldname
             
             os.chdir(foldname)
+            
+            if os.path.isfile(foldname + ".castep") or os.path.isfile(foldname + ".check"):
+                print "Removing output files from previous jobs for " + foldname
+                if os.path.isfile(foldname + ".castep"):
+                    os.remove(foldname + ".castep")
+                if os.path.isfile(foldname + ".check"):
+                    os.remove(foldname + ".check")
+            
             cmd_line = str_par_vals["rcmd"].split()
             if not "<seedname>" in cmd_line:
                 cmd_line.append(foldname)
@@ -754,7 +794,14 @@ if (str_par_vals["ctsk"] in ("all", "inputrun")):
                         cmd_line[j] = foldname
             sp.Popen(cmd_line)
             os.chdir("..")
-        
+            running_jobs.append([foldname, foldname])
+            
+            if int_par_vals["maxjobs"] > 0:
+                while len(running_jobs) >= int_par_vals["maxjobs"]:
+                    for job_ind in range(len(running_jobs)-1, -1, -1):
+                        if jobfinish_check(running_jobs[job_ind][0], running_jobs[job_ind][1]):
+                            del running_jobs[job_ind]
+            
         # If we're running an ALL job, wait for everyone to finish
         
         if str_par_vals["ctsk"] == "all":
@@ -764,11 +811,17 @@ if (str_par_vals["ctsk"] in ("all", "inputrun")):
             
             for i, cut in enumerate(cutrange):
                 foldname = seedname + "_cut_" + str(i+1) + "_kpn_1"
-                jobfinish_wait(foldname, foldname)
+                try:
+                    jobfinish_wait(foldname, foldname)
+                except JobError as JE:
+                    print "WARNING - " + str(JE)
                 
             for i, kpn in enumerate(kpnrange[1:]):
                 foldname = seedname + "_cut_1_kpn_" + str(i+2)
-                jobfinish_wait(foldname, foldname)
+                try:
+                    jobfinish_wait(foldname, foldname)
+                except JobError as JE:
+                    print "WARNING - " + str(JE)
             
             print "All jobs finished. Proceeding to analyze output"
         
@@ -788,6 +841,14 @@ if (str_par_vals["ctsk"] in ("all", "inputrun")):
             print "Running job with " + str(cut) + " eV cutoff"
             
             os.chdir(foldname)
+            
+            if os.path.isfile(jobname + ".castep") or os.path.isfile(jobname + ".check"):
+                print "Removing output files from previous jobs for " + jobname
+                if os.path.isfile(jobname + ".castep"):
+                    os.remove(jobname + ".castep")
+                if os.path.isfile(jobname + ".check"):
+                    os.remove(jobname + ".check")
+            
             cmd_line = str_par_vals["rcmd"].split()
             if not "<seedname>" in cmd_line:
                 cmd_line.append(jobname)
@@ -798,7 +859,10 @@ if (str_par_vals["ctsk"] in ("all", "inputrun")):
             sp.Popen(cmd_line)
             os.chdir("..")
             
-            jobfinish_wait(foldname, jobname)
+            try:
+                jobfinish_wait(foldname, jobname)
+            except JobError as JE:
+                print "WARNING - " + str(JE)
                     
         for i, kpn in enumerate(kpnrange[1:]):
             
@@ -820,7 +884,10 @@ if (str_par_vals["ctsk"] in ("all", "inputrun")):
             sp.Popen(cmd_line)
             os.chdir("..")
             
-            jobfinish_wait(foldname, jobname)
+            try:
+                jobfinish_wait(foldname, jobname)
+            except JobError as JE:
+                print "WARNING - " + str(JE)
         
         if str_par_vals["ctsk"] == "all":
             print "All jobs finished. Proceeding to analyze output"
@@ -1159,5 +1226,3 @@ if (str_par_vals["ctsk"] in ("all", "output")):
         out_file.close()
     else:
         print "Only graphical output currently supported is gnuplot"
-    
-    

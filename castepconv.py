@@ -398,7 +398,7 @@ def parse_stresses(cfile):
             return max_stress
         
         try:
-            cur_stress += math.sqrt(sum([float(x)**2.0 for x in l.split()[2:5]]))
+            cur_stress = math.sqrt(sum([float(x)**2.0 for x in l.split()[2:5]]))
         except ValueError:
             pass
         

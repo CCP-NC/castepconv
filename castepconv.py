@@ -874,6 +874,14 @@ if (str_par_vals["ctsk"] in ("all", "inputrun")):
             print "Running job with kpoint grid " + kgrid(kpn)
             
             os.chdir(foldname)
+            
+            if os.path.isfile(jobname + ".castep") or os.path.isfile(jobname + ".check"):
+                print "Removing output files from previous jobs for " + jobname
+                if os.path.isfile(jobname + ".castep"):
+                    os.remove(jobname + ".castep")
+                if os.path.isfile(jobname + ".check"):
+                    os.remove(jobname + ".check")
+            
             cmd_line = str_par_vals["rcmd"].split()
             if not "<seedname>" in cmd_line:
                 cmd_line.append(jobname)

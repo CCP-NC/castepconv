@@ -88,13 +88,15 @@ int_par_vals = {
 }
 
 bool_par_names = {
-"converge_stress" : "cnvstr",
-"reuse_calcs"     : "rcalc"
+"converge_stress"   : "cnvstr",
+"reuse_calcs"       : "rcalc",
+"serial_reuse"      : "sruse"
 }
 
 bool_par_vals = {
 "cnvstr" : False,
-"rcalc"  : False
+"rcalc"  : False,
+"sruse"  : True
 }
 
 # CELL and PARAM files
@@ -291,6 +293,8 @@ def strip_paramfile(plines):
         if "cut_off_energy" in l_split[0]:
             continue
         if "calculate_stress" in l_split[0] and bool_par_vals["cnvstr"]:
+            continue
+        if "reuse" in l_split[0] and bool_par_vals["sruse"]:
             continue
         
         stripped.append(l)
@@ -578,7 +582,7 @@ if (str_par_vals['ctsk'] in ("input", "inputrun", "all")):
             for l in stripped_param: 
                 iparam.write(l)
             if bool_par_vals["cnvstr"]:
-                iparam.write("calculate_stress:\ttrue")
+                iparam.write("calculate_stress:\ttrue\n")
             iparam.close()
                     
         conv_tab_file.write("\n")
@@ -619,7 +623,7 @@ if (str_par_vals['ctsk'] in ("input", "inputrun", "all")):
             for l in stripped_param: 
                 iparam.write(l)
             if bool_par_vals["cnvstr"]:
-                iparam.write("calculate_stress:\ttrue")
+                iparam.write("calculate_stress:\ttrue\n")
             iparam.close()
             
         
@@ -671,10 +675,10 @@ if (str_par_vals['ctsk'] in ("input", "inputrun", "all")):
             iparam.write("cut_off_energy:\t" + str(cut) + " eV\n")
             for l in stripped_param: 
                 iparam.write(l)
-            if prev_jobname is not None:
-                iparam.write("reuse:\t" + prev_jobname + ".check")
+            if prev_jobname is not None and bool_par_vals["sruse"]:
+                iparam.write("reuse:\t" + prev_jobname + ".check\n")
             if bool_par_vals["cnvstr"]:
-                iparam.write("calculate_stress:\ttrue")
+                iparam.write("calculate_stress:\ttrue\n")
             iparam.close()
             
             prev_jobname = jobname
@@ -708,8 +712,10 @@ if (str_par_vals['ctsk'] in ("input", "inputrun", "all")):
             iparam.write("cut_off_energy:\t" + str(cutrange[0]) + " eV\n")
             for l in stripped_param: 
                 iparam.write(l)
-            if prev_jobname is not None:
-                iparam.write("reuse:\t" + prev_jobname + ".check")
+            if prev_jobname is not None and bool_par_vals["sruse"]:
+                iparam.write("reuse:\t" + prev_jobname + ".check\n")
+            if bool_par_vals["cnvstr"]:
+                iparam.write("calculate_stress:\ttrue\n")
             iparam.close()
             
             prev_jobname = jobname

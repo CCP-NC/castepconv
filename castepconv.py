@@ -6,8 +6,17 @@
 # Copyright 2013 Science and Technology Facilities Council
 # This software is distributed under the terms of the GNU General Public License (GNU GPL)
 
-import sys, time, math, os
+import sys, time, math, os, shutil, glob
 import subprocess as sp
+
+# Try importing argparse - if the Python version is too old, use optparse
+
+try:
+    import argparse as ap
+    has_ap = True
+except ImportError:
+    has_ap = False
+    import optparse as op
 
 class ConvError(Exception):
     def __init__(self, value):
@@ -28,6 +37,12 @@ class CellError(Exception):
         return self.value
 
 class CastepError(Exception):
+    def __init__(self, value):
+        self.value = value
+    def __str__(self):
+        return self.value
+
+class OptError(Exception):
     def __init__(self, value):
         self.value = value
     def __str__(self):
@@ -359,7 +374,7 @@ def jobfinish_wait(foldname, jobname):
         try:
             is_finished = jobfinish_check(foldname, jobname)
         except JobError:
-            pass
+            raise
         time.sleep(1)
 
 # Checks whether a job is over or not
@@ -383,7 +398,7 @@ def jobfinish_check(foldname, jobname):
         elif __CASTEP_TIME__ in l:
             return True
 
-# Read forces and sum their modules up in .castep file
+# Read forces and find the maximum in .castep file
 
 def parse_forces(cfile):
     
@@ -404,6 +419,8 @@ def parse_forces(cfile):
             max_for = cur_for
     
     raise CastepError("Corrupted forces block")
+
+# Read stresses and find the maximum in .castep file
 
 def parse_stresses(cfile):
     
@@ -426,15 +443,39 @@ def parse_stresses(cfile):
     
     raise CastepError("Corrupted stresses block")
 
-###### -- MAIN PROGRAM -- ######
+# Parse command line arguments
 
-if (len(sys.argv) < 2):
-    sys.exit("Not enough arguments provided - seedname is required")
+def parse_cmd_args():
+    
+    global has_ap
+    
+    if has_ap:
+        parser = ap.ArgumentParser()
+        parser.add_argument("seedname", type=str, default=None, help="Seedname of the convergence job to run - must be the name of the .cell file before the extension.")
+        parser.add_argument('-t', '--task', type=str, default=None, help="Task to run - can be c (clear), i (input), ir (inputrun), o (output) or a (all). Overrides the .conv file value", \
+        dest="task", choices=['c', 'i', 'ir', 'o', 'a'])
+        args = parser.parse_args()
+        return args.seedname, args.task
+    else:
+        parser = op.OptionParser()
+        parser.add_option('-t', '--task', default=None, help="Task to run - can be c (clear), i (input), ir (inputrun), o (output) or a (all). Overrides the .conv file value", \
+        dest="task", choices=['c', 'i', 'ir', 'o', 'a'])
+        (options, args) = parser.parse_args()
+        if len(args) != 1:
+            seedname = None
+        else:
+            seedname = args[0]
+        return seedname, options.task
+
+###### -- MAIN PROGRAM -- ######
 
 if (sys.version_info[0] < 2 or sys.version_info[1] < 6):
     sys.exit("ERROR - Python version 2.6 or higher required to run the script")
 
-seedname = sys.argv[1]
+seedname, cmdline_task = parse_cmd_args()
+
+if seedname is None:
+    sys.exit("ERROR - <seedname> is a required argument")
 
 # PHASE 0 - Check for existence of all required files and read the necessary information
 
@@ -462,7 +503,7 @@ if (str_par_vals['ctsk'] != "output"):
         job_cellfile = open(seedname + ".cell", 'r')
         cellfile_lines = job_cellfile.readlines()
     except IOError:
-        sys.exit(".cell file for job " + seedname + " not found")
+        sys.exit("ERROR - .cell file for job " + seedname + " not found")
     
     print "Reading " + seedname + ".param"
 
@@ -470,19 +511,71 @@ if (str_par_vals['ctsk'] != "output"):
         job_paramfile = open(seedname + ".param", 'r')
         paramfile_lines = job_paramfile.readlines()
     except IOError:
-        print("WARNING: .param file for job " + seedname + " not found")
+        print("WARNING - .param file for job " + seedname + " not found")
         paramfile_lines = None
     
 else:
     
     cellfile_lines = None
     paramfile_lines = None
+
+# Override task in .conv file with command line options
+
+if cmdline_task is not None:
+    str_par_vals['ctsk'] = {'c': 'clear', 'i': 'input', 'ir': 'inputrun', 'o': 'output', 'a': 'all'}[cmdline_task]
+
+if (str_par_vals['ctsk'] not in ("clear", "input", "inputrun", "output", "all")):
+    sys.exit("ERROR - Invalid convergence_task parameter")
+    
+# PHASE 0.5 - CLEAR
+# Clear all files and folders from previous jobs
+
+if (str_par_vals['ctsk'] in ("clear")):
+    
+    # Create a list of files and folders to delete
+    
+    to_del_fold = glob.glob(seedname + "_cut_*_kpn_*")
+    
+    if os.path.exists(seedname + "_conv"):
+        to_del_fold += [seedname + "_conv"]
+    
+    # Create a list of files to delete
+    
+    to_del_files = []
+    
+    if os.path.isfile(seedname + ".conv_tab"):
+        to_del_files += [seedname + ".conv_tab"]
+    
+    if os.path.isfile(seedname + "_cut_conv.dat"):
+        to_del_files += [seedname + "_cut_conv.dat"]
+    if os.path.isfile(seedname + "_kpn_conv.dat"):
+        to_del_files += [seedname + "_kpn_conv.dat"]
+        
+    if os.path.isfile(seedname + "_conv.gp"):
+        to_del_files += [seedname + "_conv.gp"]
+    
+    print "The following folders will be deleted:"
+    
+    for f in to_del_fold:
+        sys.stdout.write(f + ' ')
+    
+    print "\nThe following files will be deleted:"
+    
+    for f in to_del_files:
+        sys.stdout.write(f + ' ')
+    
+    to_del = raw_input("\nContinue (y/N)?")
+    
+    if to_del.lower() == 'y':
+        
+        for f in to_del_fold:
+            shutil.rmtree(f)
+        for f in to_del_files:
+            os.remove(f)
+    
     
 # PHASE 1 - INPUT
 # Produce a batch of folders and files with the various configurations
-
-if (str_par_vals['ctsk'] not in ("input", "inputrun", "output", "all")):
-    sys.exit("ERROR - Invalid convergence_task parameter")
 
 if (str_par_vals['ctsk'] in ("input", "inputrun", "all")):
     
@@ -747,12 +840,14 @@ if (str_par_vals["ctsk"] in ("all", "inputrun")):
             
             os.chdir(foldname)
             
-            if os.path.isfile(foldname + ".castep") or os.path.isfile(foldname + ".check"):
+            if os.path.isfile(foldname + ".castep") or os.path.isfile(foldname + ".check") or os.path.isfile(foldname + ".0001.err"):
                 print "Removing output files from previous jobs for " + foldname
                 if os.path.isfile(foldname + ".castep"):
                     os.remove(foldname + ".castep")
                 if os.path.isfile(foldname + ".check"):
                     os.remove(foldname + ".check")
+                if os.path.isfile(foldname + ".0001.err"):
+                    os.remove(foldname + ".0001.err")
             
             cmd_line = str_par_vals["rcmd"].split()
             if not "<seedname>" in cmd_line:
@@ -784,12 +879,14 @@ if (str_par_vals["ctsk"] in ("all", "inputrun")):
             
             os.chdir(foldname)
             
-            if os.path.isfile(foldname + ".castep") or os.path.isfile(foldname + ".check"):
+            if os.path.isfile(foldname + ".castep") or os.path.isfile(foldname + ".check") or os.path.isfile(foldname + ".0001.err"):
                 print "Removing output files from previous jobs for " + foldname
                 if os.path.isfile(foldname + ".castep"):
                     os.remove(foldname + ".castep")
                 if os.path.isfile(foldname + ".check"):
                     os.remove(foldname + ".check")
+                if os.path.isfile(foldname + ".0001.err"):
+                    os.remove(foldname + ".0001.err")
             
             cmd_line = str_par_vals["rcmd"].split()
             if not "<seedname>" in cmd_line:
@@ -829,7 +926,7 @@ if (str_par_vals["ctsk"] in ("all", "inputrun")):
                 except JobError as JE:
                     print "WARNING - " + str(JE)
             
-            print "All jobs finished. Proceeding to analyze output"
+            print "\n -- All jobs finished. Proceeding to analyze output --"
         
     elif str_par_vals["rmode"] == "serial":
         
@@ -848,12 +945,14 @@ if (str_par_vals["ctsk"] in ("all", "inputrun")):
             
             os.chdir(foldname)
             
-            if os.path.isfile(jobname + ".castep") or os.path.isfile(jobname + ".check"):
+            if os.path.isfile(jobname + ".castep") or os.path.isfile(jobname + ".check") or os.path.isfile(jobname + ".0001.err"):
                 print "Removing output files from previous jobs for " + jobname
                 if os.path.isfile(jobname + ".castep"):
                     os.remove(jobname + ".castep")
                 if os.path.isfile(jobname + ".check"):
                     os.remove(jobname + ".check")
+                if os.path.isfile(jobname + ".0001.err"):
+                    os.remove(jobname + ".0001.err")
             
             cmd_line = str_par_vals["rcmd"].split()
             if not "<seedname>" in cmd_line:
@@ -881,12 +980,14 @@ if (str_par_vals["ctsk"] in ("all", "inputrun")):
             
             os.chdir(foldname)
             
-            if os.path.isfile(jobname + ".castep") or os.path.isfile(jobname + ".check"):
+            if os.path.isfile(jobname + ".castep") or os.path.isfile(jobname + ".check") or os.path.isfile(jobname + ".0001.err"):
                 print "Removing output files from previous jobs for " + jobname
                 if os.path.isfile(jobname + ".castep"):
                     os.remove(jobname + ".castep")
                 if os.path.isfile(jobname + ".check"):
                     os.remove(jobname + ".check")
+                if os.path.isfile(jobname + ".0001.err"):
+                    os.remove(jobname + ".0001.err")
             
             cmd_line = str_par_vals["rcmd"].split()
             if not "<seedname>" in cmd_line:
@@ -904,7 +1005,7 @@ if (str_par_vals["ctsk"] in ("all", "inputrun")):
                 print "WARNING - " + str(JE)
         
         if str_par_vals["ctsk"] == "all":
-            print "All jobs finished. Proceeding to analyze output"
+            print "\n -- All jobs finished. Proceeding to analyze output --\n"
         
     else:
         sys.exit("ERROR - Invalid value for the running_mode parameter")
@@ -1081,7 +1182,7 @@ if (str_par_vals["ctsk"] in ("all", "output")):
     
     # Make an estimate of the best values
         
-    print "\nConvergence results:"
+    print "Convergence results:"
     
     if len(cutnrg) < 2:
         print "Impossible to give a convergence estimate with a single cutoff point"
@@ -1223,12 +1324,20 @@ if (str_par_vals["ctsk"] in ("all", "output")):
         
         out_file.write("set xlabel \"Cutoff (eV)\"\n")
         out_file.write("set ylabel \"Final energy (eV)\"\n")
-        out_file.write("set y2label \"Total force (eV/A)\"\n")
+        out_file.write("set y2label \"Maximum force (eV/A)\"\n")
         out_file.write("set ytics nomirror\n")
         out_file.write("set y2tics\n")
-        out_file.write("plot \"" + seedname + "_cut_conv.dat\" using 1:2 with linespoints pt 7 ti \"Final energy\",")
-        out_file.write("\"" + seedname + "_cut_conv.dat\" using 1:3 with linespoints pt 7 axes x1y2 ti \"Forces\"\n")
+        out_file.write("plot \"" + seedname + "_cut_conv.dat\" using 1:2 with linespoints pt 7 lc 1 ti \"Final energy\",")
+        out_file.write("\"" + seedname + "_cut_conv.dat\" using 1:3 with linespoints pt 7 lc 2 axes x1y2 ti \"Force\"\n")
         out_file.write("pause -1 \"Hit return to continue\"\n")
+        
+        if bool_par_vals["cnvstr"]:
+            out_file.write("set y2label \"Maximum stress (GPa)\"\n")
+            out_file.write("set ytics nomirror\n")
+            out_file.write("set y2tics\n")
+            out_file.write("plot \"" + seedname + "_cut_conv.dat\" using 1:2 with linespoints pt 7 lc 1 ti \"Final energy\",")
+            out_file.write("\"" + seedname + "_cut_conv.dat\" using 1:4 with linespoints pt 7 lc 3 axes x1y2 ti \"Stress\"\n")
+            out_file.write("pause -1 \"Hit return to continue\"\n")
         
         out_file.write("set xlabel \"k-points\"\n")
         out_file.write("set ylabel \"Final energy (eV)\"\n")
@@ -1236,6 +1345,14 @@ if (str_par_vals["ctsk"] in ("all", "output")):
         out_file.write("plot \"" + seedname + "_kpn_conv.dat\" using 1:2 with linespoints pt 7 ti \"Final energy\",")
         out_file.write("\"" + seedname + "_kpn_conv.dat\" using 1:3 with linespoints pt 7 axes x1y2 ti \"Forces\"\n")
         out_file.write("pause -1 \"Hit return to continue\"\n")
+        
+        if bool_par_vals["cnvstr"]:
+            out_file.write("set y2label \"Maximum stress (GPa)\"\n")
+            out_file.write("set ytics nomirror\n")
+            out_file.write("set y2tics\n")
+            out_file.write("plot \"" + seedname + "_kpn_conv.dat\" using 1:2 with linespoints pt 7 lc 1 ti \"Final energy\",")
+            out_file.write("\"" + seedname + "_kpn_conv.dat\" using 1:4 with linespoints pt 7 lc 3 axes x1y2 ti \"Stress\"\n")
+            out_file.write("pause -1 \"Hit return to continue\"\n")
         
         out_file.close()
     else:

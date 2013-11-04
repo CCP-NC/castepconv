@@ -132,8 +132,10 @@ __CASTEP_CUTOFF__       = "plane wave basis set cut-off                   :"
 __CASTEP_KPOINTS__      = "MP grid size for SCF calculation is"
 __CASTEP_ENERGY__       = "Final energy, E             ="
 __CASTEP_FORCES__       = "***************** Symmetrised Forces *****************"
+__CASTEP_FORCES_ALT__   = "*********************** Forces ***********************"
 __CASTEP_FORCES_END__   = "*                                                    *"
 __CASTEP_STRESSES__     = "*********** Symmetrised Stress Tensor ***********"
+__CASTEP_STRESSES_ALT__ = "***************** Stress Tensor *****************"
 __CASTEP_STRESSES_END__ = "*                                               *"
 
 # Just a useful snippet to return a kpoint grid from a 3-ple
@@ -259,7 +261,7 @@ def strip_cellfile(clines):
             if "kpoints_mp_spacing" in l_low:
                 continue
             if "%block" in l_low:
-                if "kpoint_list" in l_low:
+                if "kpoints_list" in l_low:
                     to_strip = True
                     continue
                 elif "lattice_abc" in l_low:
@@ -625,6 +627,11 @@ if (str_par_vals['ctsk'] in ("input", "inputrun", "all")):
     
     # Open a .conv_tab file to keep track of the created files and folders. Will be read if output is done as a separate operation
     
+    if os.path.isfile(seedname + ".conv_tab"):
+        to_del = raw_input("Warning: " + seedname + ".conv_tab already exists. This file will be overwritten. Continue (y/N)?")
+        if to_del.lower() != 'y':
+            sys.exit("Aborting")
+    
     conv_tab_file = open(seedname + ".conv_tab", 'w')
     
     if (float_par_vals["cutmin"] <= 0.0 or float_par_vals["cutstep"] <= 0.0 or float_par_vals["cutmax"] < float_par_vals["cutmin"]):
@@ -880,9 +887,13 @@ if (str_par_vals["ctsk"] in ("all", "inputrun")):
             if int_par_vals["maxjobs"] > 0:
                 while len(running_jobs) >= int_par_vals["maxjobs"]:
                     for job_ind in range(len(running_jobs)-1, -1, -1):
-                        if jobfinish_check(running_jobs[job_ind][0], running_jobs[job_ind][1]):
+                        try:
+                            if jobfinish_check(running_jobs[job_ind][0], running_jobs[job_ind][1]):
+                                del running_jobs[job_ind]
+                        except JobError as JE:
                             del running_jobs[job_ind]
-            
+                            print "WARNING - " + str(JE)
+        
         for i, kpn in enumerate(kpnrange[1:]):
             
             if kpn in old_kpnrange:
@@ -917,8 +928,12 @@ if (str_par_vals["ctsk"] in ("all", "inputrun")):
             if int_par_vals["maxjobs"] > 0:
                 while len(running_jobs) >= int_par_vals["maxjobs"]:
                     for job_ind in range(len(running_jobs)-1, -1, -1):
-                        if jobfinish_check(running_jobs[job_ind][0], running_jobs[job_ind][1]):
+                        try:
+                            if jobfinish_check(running_jobs[job_ind][0], running_jobs[job_ind][1]):
+                                del running_jobs[job_ind]
+                        except JobError as JE:
                             del running_jobs[job_ind]
+                            print "WARNING - " + str(JE)
             
         # If we're running an ALL job, wait for everyone to finish
         
@@ -1076,7 +1091,7 @@ if (str_par_vals["ctsk"] in ("all", "output")):
         start_l = rindex_cont(castepfile, __CASTEP_HEADER__)
         
         for j, l in enumerate(castepfile[start_l:]):
-            
+                                    
             try:
                 if __CASTEP_ATOMN__ in l and atom_n is None:
                     atom_n = int(l.split()[7])
@@ -1086,14 +1101,15 @@ if (str_par_vals["ctsk"] in ("all", "output")):
                     kpn_check = tuple([int(x) for x in l.split()[7:]])
                 elif __CASTEP_ENERGY__ in l:
                     i_nrg = float(l.split()[4])
-                elif __CASTEP_FORCES__ in l:
+                elif __CASTEP_FORCES__ in l or __CASTEP_FORCES_ALT__ in l:
                     i_for = parse_forces(castepfile[start_l+j:])
-                elif calc_str and __CASTEP_STRESSES__ in l:
+                elif calc_str and (__CASTEP_STRESSES__ in l or __CASTEP_STRESSES_ALT__ in l):
                     i_str = parse_stresses(castepfile[start_l+j:])
             except ValueError:
                 sys.exit("ERROR - Corrupted " + filepath + " file detected")
             except CastepError as CE:
                 sys.exit("ERROR - " + str(CE) + " in file " + filepath)
+            
             
             if atom_n is not None and i_nrg is not None and i_for is not None and cut_check is not None and kpn_check is not None and ((calc_str and i_str is not None) or not calc_str):
                 break
@@ -1117,6 +1133,7 @@ if (str_par_vals["ctsk"] in ("all", "output")):
     
     kpnnrg.append(cutnrg[0])
     kpnfor.append(cutfor[0])
+    
     if calc_str:
         kpnstr.append(cutstr[0])
     
@@ -1153,9 +1170,9 @@ if (str_par_vals["ctsk"] in ("all", "output")):
                     kpn_check = tuple([int(x) for x in l.split()[7:]])
                 elif __CASTEP_ENERGY__ in l:
                     i_nrg = float(l.split()[4])
-                elif __CASTEP_FORCES__ in l:
+                elif __CASTEP_FORCES__ in l or __CASTEP_FORCES_ALT__ in l:
                     i_for = parse_forces(castepfile[start_l+j:])
-                elif calc_str and __CASTEP_STRESSES__ in l:
+                elif calc_str and (__CASTEP_STRESSES__ in l or __CASTEP_STRESSES_ALT__ in l):
                     i_str = parse_stresses(castepfile[start_l+j:])
             except ValueError:
                 sys.exit("ERROR - Corrupted " + filepath + " file detected")
@@ -1414,6 +1431,7 @@ if (str_par_vals["ctsk"] in ("all", "output")):
         out_file.write("@    yaxis tick major " + str((y1rng[1]-y1rng[0])/8.0) + '\n')
         out_file.write("@    yaxis offset 0.0, 1.0\n")
         out_file.write("@    s0 hidden false\n@    s0 on\n")
+        out_file.write("@    s0 legend \"Final energy\"\n")
         out_file.write("@    s0 line color 1\n")
         out_file.write("@    s0 symbol 1\n")
         out_file.write("@    s0 symbol size 0.7\n")
@@ -1436,6 +1454,7 @@ if (str_par_vals["ctsk"] in ("all", "output")):
         out_file.write("@    yaxis tick place opposite\n")
         out_file.write("@    yaxis ticklabel place opposite\n")
         out_file.write("@    s0 hidden false\n@    s0 on\n")
+        out_file.write("@    s0 legend \"Max force\"\n")
         out_file.write("@    s0 line color 2\n")
         out_file.write("@    s0 symbol 1\n")
         out_file.write("@    s0 symbol size 0.7\n")
@@ -1457,6 +1476,76 @@ if (str_par_vals["ctsk"] in ("all", "output")):
         
         out_file.close()
         
+        if bool_par_vals["cnvstr"]:
+            
+            # Cutoff vs energy and stresses
+            
+            out_file = open(seedname + "_cut_str_conv.agr", 'w')
+            
+            xrng  = (min(cutrange), max(cutrange))
+            y1rng = (min(cutnrg)-0.1*(max(cutnrg)-min(cutnrg)), max(cutnrg)+0.1*(max(cutnrg)-min(cutnrg)))
+            y2rng = (min(cutstr)-0.1*(max(cutstr)-min(cutstr)), max(cutstr)+0.1*(max(cutstr)-min(cutstr)))
+            
+            # Set up the graphics
+            
+            out_file.write("@version 50123\n")
+            out_file.write("@title \"" + seedname + " - Energy and stresses vs cutoff\"\n")
+            
+            out_file.write("@g0 on\n@g0 hidden false\n@with g0\n")
+            out_file.write("@world " + str(xrng[0]) + ',' + str(y1rng[0]) + ',' + str(xrng[1]) + ',' + str(y1rng[1]) + '\n')
+            out_file.write("@    view 0.150000, 0.150000, 1.150000, 0.850000\n")
+            out_file.write("@    xaxis label \"Cutoff (eV)\"\n")
+            out_file.write("@    xaxis tick major " + str(float_par_vals["cutstep"]) + '\n')
+            out_file.write("@    xaxis offset 0.0, 1.0\n")
+            out_file.write("@    yaxis label \"Final energy (eV)\"\n")
+            out_file.write("@    yaxis tick major " + str((y1rng[1]-y1rng[0])/8.0) + '\n')
+            out_file.write("@    yaxis offset 0.0, 1.0\n")
+            out_file.write("@    s0 hidden false\n@    s0 on\n")
+            out_file.write("@    s0 legend \"Final energy\"\n")
+            out_file.write("@    s0 line color 1\n")
+            out_file.write("@    s0 symbol 1\n")
+            out_file.write("@    s0 symbol size 0.7\n")
+            out_file.write("@    s0 symbol color 1\n")
+            out_file.write("@    s0 symbol fill color 1\n")
+            out_file.write("@    s0 symbol fill pattern 1\n")
+            
+            out_file.write("@g1 on\n@g1 hidden false\n@with g1\n")
+            out_file.write("@world " + str(xrng[0]) + ',' + str(y2rng[0]) + ',' + str(xrng[1]) + ',' + str(y2rng[1]) + '\n')
+            out_file.write("@    view 0.150000, 0.150000, 1.150000, 0.850000\n")
+            out_file.write("@    xaxis label \"\"\n")
+            out_file.write("@    xaxis tick off\n")
+            out_file.write("@    xaxis tick major " + str(float_par_vals["cutstep"]) + '\n')
+            out_file.write("@    yaxis label \"Stress (GPa)\"\n")
+            out_file.write("@    yaxis tick major " + str((y2rng[1]-y2rng[0])/8.0) + '\n')
+            out_file.write("@    yaxis ticklabel format exponential\n")
+            out_file.write("@    yaxis ticklabel prec 1\n")
+            out_file.write("@    yaxis offset 1.0, 0.0\n")
+            out_file.write("@    yaxis label place opposite\n")
+            out_file.write("@    yaxis tick place opposite\n")
+            out_file.write("@    yaxis ticklabel place opposite\n")
+            out_file.write("@    s0 hidden false\n@    s0 on\n")
+            out_file.write("@    s0 legend \"Max stress\"\n")
+            out_file.write("@    s0 line color 2\n")
+            out_file.write("@    s0 symbol 1\n")
+            out_file.write("@    s0 symbol size 0.7\n")
+            out_file.write("@    s0 symbol color 2\n")
+            out_file.write("@    s0 symbol fill color 2\n")
+            out_file.write("@    s0 symbol fill pattern 1\n")
+            
+            # Input the actual data
+            
+            out_file.write("@target G0.S0\n@type xy\n")
+            for i, c in enumerate(cutrange):
+                out_file.write(str(c) + '\t' + str(cutnrg[i]) + '\n')
+            out_file.write('&\n')
+            
+            out_file.write("@target G1.S0\n@type xy\n")
+            for i, c in enumerate(cutrange):
+                out_file.write(str(c) + '\t' + str(cutstr[i]) + '\n')
+            out_file.write('&\n')
+            
+            out_file.close()
+        
         # K points vs energy and forces
         
         out_file = open(seedname + "_kpn_conv.agr", 'w')
@@ -1474,12 +1563,13 @@ if (str_par_vals["ctsk"] in ("all", "output")):
         out_file.write("@world " + str(xrng[0]) + ',' + str(y1rng[0]) + ',' + str(xrng[1]) + ',' + str(y1rng[1]) + '\n')
         out_file.write("@    view 0.150000, 0.150000, 1.150000, 0.850000\n")
         out_file.write("@    xaxis label \"k points\"\n")
-        out_file.write("@    xaxis tick major " + str(float_par_vals["kpnstep"]*3) + '\n')
+        out_file.write("@    xaxis tick major " + str(int_par_vals["kpnstep"]*3) + '\n')
         out_file.write("@    xaxis offset 0.0, 1.0\n")
         out_file.write("@    yaxis label \"Final energy (eV)\"\n")
         out_file.write("@    yaxis tick major " + str((y1rng[1]-y1rng[0])/8.0) + '\n')
         out_file.write("@    yaxis offset 0.0, 1.0\n")
         out_file.write("@    s0 hidden false\n@    s0 on\n")
+        out_file.write("@    s0 legend \"Final energy\"\n")
         out_file.write("@    s0 line color 1\n")
         out_file.write("@    s0 symbol 1\n")
         out_file.write("@    s0 symbol size 0.7\n")
@@ -1492,7 +1582,7 @@ if (str_par_vals["ctsk"] in ("all", "output")):
         out_file.write("@    view 0.150000, 0.150000, 1.150000, 0.850000\n")
         out_file.write("@    xaxis label \"\"\n")
         out_file.write("@    xaxis tick off\n")
-        out_file.write("@    xaxis tick major " + str(float_par_vals["kpnstep"]*3) + '\n')
+        out_file.write("@    xaxis tick major " + str(int_par_vals["kpnstep"]*3) + '\n')
         out_file.write("@    yaxis label \"Force (eV/Ang)\"\n")
         out_file.write("@    yaxis tick major " + str((y2rng[1]-y2rng[0])/8.0) + '\n')
         out_file.write("@    yaxis ticklabel format exponential\n")
@@ -1502,6 +1592,7 @@ if (str_par_vals["ctsk"] in ("all", "output")):
         out_file.write("@    yaxis tick place opposite\n")
         out_file.write("@    yaxis ticklabel place opposite\n")
         out_file.write("@    s0 hidden false\n@    s0 on\n")
+        out_file.write("@    s0 legend \"Max force\"\n")
         out_file.write("@    s0 line color 2\n")
         out_file.write("@    s0 symbol 1\n")
         out_file.write("@    s0 symbol size 0.7\n")
@@ -1522,5 +1613,76 @@ if (str_par_vals["ctsk"] in ("all", "output")):
         out_file.write('&\n')
         
         out_file.close()
+        
+        if bool_par_vals["cnvstr"]:
+            
+            # K points vs energy and stresses
+            
+            out_file = open(seedname + "_kpn_str_conv.agr", 'w')
+        
+            xrng  = (sum(kpnrange[0]), sum(kpnrange[-1]))
+            y1rng = (min(kpnnrg)-0.1*(max(kpnnrg)-min(kpnnrg)), max(cutnrg)+0.1*(max(kpnnrg)-min(kpnnrg)))
+            y2rng = (min(kpnstr)-0.1*(max(kpnstr)-min(kpnstr)), max(kpnstr)+0.1*(max(kpnstr)-min(kpnstr)))
+            
+            # Set up the graphics
+            
+            out_file.write("@version 50123\n")
+            out_file.write("@title \"" + seedname + " - Energy and forces vs k points\"\n")
+            
+            out_file.write("@g0 on\n@g0 hidden false\n@with g0\n")
+            out_file.write("@world " + str(xrng[0]) + ',' + str(y1rng[0]) + ',' + str(xrng[1]) + ',' + str(y1rng[1]) + '\n')
+            out_file.write("@    view 0.150000, 0.150000, 1.150000, 0.850000\n")
+            out_file.write("@    xaxis label \"k points\"\n")
+            out_file.write("@    xaxis tick major " + str(int_par_vals["kpnstep"]*3) + '\n')
+            out_file.write("@    xaxis offset 0.0, 1.0\n")
+            out_file.write("@    yaxis label \"Final energy (eV)\"\n")
+            out_file.write("@    yaxis tick major " + str((y1rng[1]-y1rng[0])/8.0) + '\n')
+            out_file.write("@    yaxis offset 0.0, 1.0\n")
+            out_file.write("@    s0 hidden false\n@    s0 on\n")
+            out_file.write("@    s0 legend \"Final energy\"\n")
+            out_file.write("@    s0 line color 1\n")
+            out_file.write("@    s0 symbol 1\n")
+            out_file.write("@    s0 symbol size 0.7\n")
+            out_file.write("@    s0 symbol color 1\n")
+            out_file.write("@    s0 symbol fill color 1\n")
+            out_file.write("@    s0 symbol fill pattern 1\n")
+            
+            out_file.write("@g1 on\n@g1 hidden false\n@with g1\n")
+            out_file.write("@world " + str(xrng[0]) + ',' + str(y2rng[0]) + ',' + str(xrng[1]) + ',' + str(y2rng[1]) + '\n')
+            out_file.write("@    view 0.150000, 0.150000, 1.150000, 0.850000\n")
+            out_file.write("@    xaxis label \"\"\n")
+            out_file.write("@    xaxis tick off\n")
+            out_file.write("@    xaxis tick major " + str(int_par_vals["kpnstep"]*3) + '\n')
+            out_file.write("@    yaxis label \"Stress (GPa)\"\n")
+            out_file.write("@    yaxis tick major " + str((y2rng[1]-y2rng[0])/8.0) + '\n')
+            out_file.write("@    yaxis ticklabel format exponential\n")
+            out_file.write("@    yaxis ticklabel prec 1\n")
+            out_file.write("@    yaxis offset 1.0, 0.0\n")
+            out_file.write("@    yaxis label place opposite\n")
+            out_file.write("@    yaxis tick place opposite\n")
+            out_file.write("@    yaxis ticklabel place opposite\n")
+            out_file.write("@    s0 hidden false\n@    s0 on\n")
+            out_file.write("@    s0 legend \"Max stress\"\n")
+            out_file.write("@    s0 line color 2\n")
+            out_file.write("@    s0 symbol 1\n")
+            out_file.write("@    s0 symbol size 0.7\n")
+            out_file.write("@    s0 symbol color 2\n")
+            out_file.write("@    s0 symbol fill color 2\n")
+            out_file.write("@    s0 symbol fill pattern 1\n")
+            
+            # Input the actual data
+            
+            out_file.write("@target G0.S0\n@type xy\n")
+            for i, k in enumerate(kpnrange):
+                out_file.write(str(sum(k)) + '\t' + str(kpnnrg[i]) + '\n')
+            out_file.write('&\n')
+            
+            out_file.write("@target G1.S0\n@type xy\n")
+            for i, k in enumerate(kpnrange):
+                out_file.write(str(sum(k)) + '\t' + str(kpnstr[i]) + '\n')
+            out_file.write('&\n')
+            
+            out_file.close()
+        
     else:
-        print "Only graphical output currently supported is gnuplot"
+        print "Only values currently supported for the output_type variable are gnuplot and [xm]grace"

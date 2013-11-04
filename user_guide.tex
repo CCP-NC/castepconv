@@ -52,8 +52,8 @@ The accepted parameter names are listed in the subsections below.
 \textbf{running\_mode}: describes the mode in which the calculations should be ran. If PARALLEL, all calculations will be launched at the same time (ideal for job submission on a cluster). If SERIAL, the program will wait for one calculation to finish before the next one begins (and reuse the .check file from the previous calculation as a starting point). In the latter case, all files will be created in a single folder. Default is PARALLEL.\newline
 \textit{Legal values}: PARALLEL, SERIAL\newline
 
-\textbf{output\_type}: plotting program for which an output script should be created. For now only GNUPLOT is supported. Default is GNUPLOT.\newline
-\textit{Legal values}: GNUPLOT\newline
+\textbf{output\_type}: plotting program for which an output script should be created. For now only GNUPLOT and GRACE are supported. The keywords GRACE and XMGRACE are equivalent. Default is GNUPLOT.\newline
+\textit{Legal values}: GNUPLOT, [XM]GRACE\newline
 
 \textbf{running\_command}: command line that should be used to run jobs. This should be expressed by replacing the name of the job with the generic token \textless \textit{seedname}\textgreater. Default is \textit{castep \textless seedname\textgreater -dryrun}.\newline
 \textit{Legal values}: any string containing the token \textless \textit{seedname}\textgreater\newline

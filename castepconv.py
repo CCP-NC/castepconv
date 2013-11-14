@@ -665,12 +665,16 @@ if (str_par_vals['ctsk'] in ("input", "inputrun", "all")):
             
             conv_tab_file.write(str(cut) + " eV\t")
             
-            # Skip if we already have it
+            foldname = seedname + "_cut_" + str(i+1) + "_kpn_1"
+            
+            # If we're reusing data, skip recreating the folder only if we already have some results
             
             if cut in old_cutrange:
-                continue
-            
-            foldname = seedname + "_cut_" + str(i+1) + "_kpn_1"
+                try:
+                    if jobfinish_check(foldname, foldname):
+                        continue
+                except JobError:
+                    pass
             
             print "Creating folder " + foldname
             
@@ -708,10 +712,14 @@ if (str_par_vals['ctsk'] in ("input", "inputrun", "all")):
             
             conv_tab_file.write(kgrid(kpn) + "\t|\t")
             
-            if kpn in old_kpnrange:
-                continue
-            
             foldname = seedname + "_cut_1_kpn_" + str(i+2)
+            
+            if kpn in old_kpnrange:
+                try:
+                    if jobfinish_check(foldname, foldname):
+                        continue
+                except JobError:
+                    pass
             
             print "Creating folder " + foldname
             
@@ -771,10 +779,14 @@ if (str_par_vals['ctsk'] in ("input", "inputrun", "all")):
             
             conv_tab_file.write(str(cut) + " eV\t")
             
-            if cut in old_cutrange:
-                continue
-            
             jobname = seedname + "_cut_" + str(i+1) + "_kpn_1"
+            
+            if cut in old_cutrange:
+                try:
+                    if jobfinish_check(foldname, jobname):
+                        continue
+                except JobError:
+                    pass
             
             print "Creating files for job " + jobname
             
@@ -807,10 +819,14 @@ if (str_par_vals['ctsk'] in ("input", "inputrun", "all")):
             
             conv_tab_file.write(kgrid(kpn) + "\t|\t")
             
-            if kpn in old_kpnrange:
-                continue
-            
             jobname = seedname + "_cut_1_kpn_" + str(i+2)
+            
+            if kpn in old_kpnrange:
+                try:
+                    if jobfinish_check(foldname, jobname):
+                        continue
+                except JobError:
+                    pass
             
             print "Creating files for job " + jobname
             
@@ -853,10 +869,16 @@ if (str_par_vals["ctsk"] in ("all", "inputrun")):
         
         for i, cut in enumerate(cutrange):
             
-            if cut in old_cutrange:
-                continue
-            
             foldname = seedname + "_cut_" + str(i+1) + "_kpn_1"
+            
+            # If we're reusing data, skip running only if we already have some results
+            
+            if cut in old_cutrange:
+                try:
+                    if jobfinish_check(foldname, foldname):
+                        continue
+                except JobError:
+                    pass
             
             print "Running job " + foldname
             
@@ -899,10 +921,14 @@ if (str_par_vals["ctsk"] in ("all", "inputrun")):
         
         for i, kpn in enumerate(kpnrange[1:]):
             
-            if kpn in old_kpnrange:
-                continue
-            
             foldname = seedname + "_cut_1_kpn_" + str(i+2)
+            
+            if kpn in old_kpnrange:
+                try:
+                    if jobfinish_check(foldname, foldname):
+                        continue
+                except JobError:
+                    pass
             
             print "Running job " + foldname
             
@@ -972,10 +998,14 @@ if (str_par_vals["ctsk"] in ("all", "inputrun")):
         
         for i, cut in enumerate(cutrange):
             
-            if cut in old_cutrange:
-                continue
-            
             jobname = seedname + "_cut_" + str(i+1) + "_kpn_1"
+            
+            if cut in old_cutrange:
+                try:
+                    if jobfinish_check(foldname, jobname):
+                        continue
+                except JobError:
+                    pass
             
             print "Running job with " + str(cut) + " eV cutoff"
             
@@ -1010,10 +1040,14 @@ if (str_par_vals["ctsk"] in ("all", "inputrun")):
                     
         for i, kpn in enumerate(kpnrange[1:]):
             
-            if kpn in old_kpnrange:
-                continue
-            
             jobname = seedname + "_cut_1_kpn_" + str(i+2)
+            
+            if kpn in old_kpnrange:
+                try:
+                    if jobfinish_check(foldname, foldname):
+                        continue
+                except JobError:
+                    pass
             
             print "Running job with kpoint grid " + kgrid(kpn)
             

@@ -880,7 +880,10 @@ if (str_par_vals["ctsk"] in ("all", "inputrun")):
                         cmd_line[j] = foldname
             # Note: subprocess.Popen opens a subprocess without waiting for it to finish.
             # In fact, if we don't take care to check that all files are closed (see later) they might as well not be and we might end with a crash
-            sp.Popen(cmd_line)
+            try:
+                sp.Popen(cmd_line)
+            except ExecError:
+                sys.exit("ERROR - running_command not found on the current system or is not an executable")
             os.chdir("..")
             running_jobs.append([foldname, foldname])
             
@@ -921,7 +924,10 @@ if (str_par_vals["ctsk"] in ("all", "inputrun")):
                 for j, l in enumerate(cmd_line):
                     if l == "<seedname>":
                         cmd_line[j] = foldname
-            sp.Popen(cmd_line)
+            try:
+                sp.Popen(cmd_line)
+            except ExecError:
+                sys.exit("ERROR - running_command not found on the current system or is not an executable")
             os.chdir("..")
             running_jobs.append([foldname, foldname])
             
@@ -991,7 +997,10 @@ if (str_par_vals["ctsk"] in ("all", "inputrun")):
                 for j, l in enumerate(cmd_line):
                     if l == "<seedname>":
                         cmd_line[j] = jobname
-            sp.Popen(cmd_line)
+            try:
+                sp.Popen(cmd_line)
+            except ExecError:
+                sys.exit("ERROR - running_command not found on the current system or is not an executable")
             os.chdir("..")
             
             try:
@@ -1026,7 +1035,10 @@ if (str_par_vals["ctsk"] in ("all", "inputrun")):
                 for j, l in enumerate(cmd_line):
                     if l == "<seedname>":
                         cmd_line[j] = jobname
-            sp.Popen(cmd_line)
+            try:
+                sp.Popen(cmd_line)
+            except ExecError:
+                sys.exit("ERROR - running_command not found on the current system or is not an executable")
             os.chdir("..")
             
             try:

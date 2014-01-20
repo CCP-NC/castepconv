@@ -124,6 +124,7 @@ kpnrange = None
 
 abc_len = None
 kpn_base = (1, 1, 1)
+pseudo_pots = None
 
 __CASTEP_HEADER__       = "+-------------------------------------------------+"
 __CASTEP_TIME__         = "Total time          ="
@@ -222,10 +223,12 @@ def strip_cellfile(clines):
     to_strip = False
     to_read_abc = False
     to_read_cart = False
+    to_read_pot = False
     
     abc = None
     u = 1.0
     kbase = (1, 1, 1)
+    ppot = None
     
     for l in clines:
         
@@ -254,8 +257,21 @@ def strip_cellfile(clines):
                                 abc[i] = math.sqrt(sum([(u*float(x))**2.0 for x in l_split]))
                                 break
                     except ValueError:
-                        raise CellError('Bad formatting in .cell file LATTICE_ABC block')
+                        raise CellError('Bad formatting in .cell file LATTICE_CART block')
                     to_read_cart = (min(abc) < 0.0)
+            if to_read_pot:
+                l_split = l.strip().split()
+                if "%endblock" in l_low:
+                    if not "species_pot" in l_low:
+                        raise CellError('Bad formatting in .cell file SPECIES_POT block')
+                    else:
+                        to_read_pot = False
+                else:
+                    try:
+                        ppot.append((l_split[0], l_split[1]))
+                    except ValueError:
+                        raise CellError('Bad formatting in .cell file SPECIES_POT block')
+            
             if "kpoints_mp_grid" in l_low:
                 continue
             if "kpoints_mp_spacing" in l_low:
@@ -274,6 +290,11 @@ def strip_cellfile(clines):
                         raise CellError('Duplicated LATTICE_* block in .cell file')
                     to_read_cart = True
                     abc = [-1.0, -1.0, -1.0]
+                elif "species_pot" in l_low:
+                    if ppot is not None:
+                        raise CellError('Duplicated SPECIES_POT block in .cell file')                        
+                    to_read_pot = True
+                    ppot = []
             if to_strip:
                 if "%endblock" in l_low:
                     to_strip = False
@@ -287,7 +308,7 @@ def strip_cellfile(clines):
     max_e = max(abc)
     kbase = tuple([int(max_e/x) for x in abc])
     
-    return stripped, tuple(abc), kbase
+    return stripped, tuple(abc), kbase, ppot
 
 # Strip .param file from unnecessary lines to get only the ones we care for (i.e. remove all reference to task and cutoff)
 
@@ -469,6 +490,43 @@ def parse_cmd_args():
             seedname = args[0]
         return seedname, options.task
 
+# Write a folder with given cutoff and kpoints
+
+def create_conv_folder(foldname, jobname, cut, kpn, prev_jobname=None):
+    
+    global ovwrite_files, stripped_cell, stripped_param, bool_par_vals, str_par_vals
+    
+    
+    if not os.path.exists(foldname): 
+        print "Creating folder " + foldname
+        os.makedirs(foldname)
+    elif not ovwrite_files:
+        to_del = raw_input("Warning: folder " + foldname + " already exists. \
+        \nSome files might be overwritten. Continue (y/N/y-all)?")
+        if to_del.lower() == 'y-all':
+            ovwrite_files = True
+        elif to_del.lower() != 'y':
+            sys.exit("Aborting")
+    
+    print "Creating files for job " + jobname
+    icell = open(foldname + r'/' + jobname + '.cell', 'w')
+    iparam = open(foldname + r'/' + jobname + '.param', 'w')
+    
+    for l in stripped_cell: 
+        icell.write(l)
+    icell.write("\nkpoint_mp_grid " + kgrid(kpn) + "\n")
+    icell.close()
+    
+    iparam.write("task:\tSinglePoint\n")
+    iparam.write("cut_off_energy:\t" + str(cut) + " eV\n")
+    for l in stripped_param: 
+        iparam.write(l)
+    if prev_jobname is not None and bool_par_vals["sruse"]:
+        iparam.write("reuse:\t" + prev_jobname + ".check\n")
+    if bool_par_vals["cnvstr"]:
+        iparam.write("calculate_stress:\ttrue\n")
+    iparam.close()
+
 ###### -- MAIN PROGRAM -- ######
 
 if (sys.version_info[0] < 2 or sys.version_info[1] < 6):
@@ -599,7 +657,7 @@ if (str_par_vals['ctsk'] in ("input", "inputrun", "all")):
     # First create a "stripped" version of cell and param files, to use as a template for the new files to generate
     
     try:
-        stripped_cell, abc_len, kpn_base = strip_cellfile(cellfile_lines)
+        stripped_cell, abc_len, kpn_base, pseudo_pots = strip_cellfile(cellfile_lines)
     except CellError as CE:
         sys.exit("ERROR - " + str(CE))
     if paramfile_lines is not None:
@@ -672,34 +730,8 @@ if (str_par_vals['ctsk'] in ("input", "inputrun", "all")):
             
             foldname = seedname + "_cut_" + str(i+1) + "_kpn_1"
             
-            print "Creating folder " + foldname
+            create_conv_folder(foldname, foldname, cut, kpnrange[0])
             
-            if not os.path.exists(foldname): 
-                os.makedirs(foldname)
-            elif not ovwrite_files:
-                to_del = raw_input("Warning: folder " + foldname + " already exists. \
-                \nSome files might be overwritten. Continue (y/N/y-all)?")
-                if to_del.lower() == 'y-all':
-                    ovwrite_files = True
-                elif to_del.lower() != 'y':
-                    sys.exit("Aborting")
-            
-            icell = open(foldname + r'/' + foldname + '.cell', 'w')
-            iparam = open(foldname + r'/' + foldname + '.param', 'w')
-            
-            for l in stripped_cell: 
-                icell.write(l)        
-            icell.write("\nkpoint_mp_grid " + kgrid(kpnrange[0]) + "\n")
-            icell.close()
-            
-            iparam.write("task:\tSinglePoint\n")
-            iparam.write("cut_off_energy:\t" + str(cut) + " eV\n")
-            for l in stripped_param: 
-                iparam.write(l)
-            if bool_par_vals["cnvstr"]:
-                iparam.write("calculate_stress:\ttrue\n")
-            iparam.close()
-                    
         conv_tab_file.write("\n")
             
         conv_tab_file.write("kpoint_n:\t" + kgrid(kpnrange[0]) + "\t|\t")
@@ -713,35 +745,8 @@ if (str_par_vals['ctsk'] in ("input", "inputrun", "all")):
             
             foldname = seedname + "_cut_1_kpn_" + str(i+2)
             
-            print "Creating folder " + foldname
+            create_conv_folder(foldname, foldname, cutrange[0], kpn)
             
-            if not os.path.exists(foldname): 
-                os.makedirs(foldname)
-            elif not ovwrite_files:
-                to_del = raw_input("Warning: folder " + foldname + " already exists. \
-                \nSome files might be overwritten. Continue (y/N/y-all)?")
-                if to_del.lower() == 'y-all':
-                    ovwrite_files = True
-                elif to_del.lower() != 'y':
-                    sys.exit("Aborting")
-                        
-            icell = open(foldname + r'/' + foldname + '.cell', 'w')
-            iparam = open(foldname + r'/' + foldname + '.param', 'w')
-            
-            for l in stripped_cell: 
-                icell.write(l)        
-            icell.write("\nkpoint_mp_grid " + kgrid(kpn) + "\n")
-            icell.close()
-            
-            iparam.write("task:\tSinglePoint\n")
-            iparam.write("cut_off_energy:\t" + str(cutrange[0]) + " eV\n")
-            for l in stripped_param: 
-                iparam.write(l)
-            if bool_par_vals["cnvstr"]:
-                iparam.write("calculate_stress:\ttrue\n")
-            iparam.close()
-            
-        
         conv_tab_file.close()
         
     elif str_par_vals["rmode"] == "serial":
@@ -776,25 +781,7 @@ if (str_par_vals['ctsk'] in ("input", "inputrun", "all")):
             
             jobname = seedname + "_cut_" + str(i+1) + "_kpn_1"
             
-            print "Creating files for job " + jobname
-            
-            icell = open(foldname + r'/' + jobname + '.cell', 'w')
-            iparam = open(foldname + r'/' + jobname + '.param', 'w')
-            
-            for l in stripped_cell: 
-                icell.write(l)        
-            icell.write("\nkpoint_mp_grid " + kgrid(kpnrange[0]) + "\n")
-            icell.close()
-            
-            iparam.write("task:\tSinglePoint\n")
-            iparam.write("cut_off_energy:\t" + str(cut) + " eV\n")
-            for l in stripped_param: 
-                iparam.write(l)
-            if prev_jobname is not None and bool_par_vals["sruse"]:
-                iparam.write("reuse:\t" + prev_jobname + ".check\n")
-            if bool_par_vals["cnvstr"]:
-                iparam.write("calculate_stress:\ttrue\n")
-            iparam.close()
+            create_conv_folder(foldname, jobname, cut, kpnrange[0], prev_jobname)
             
             prev_jobname = jobname
             
@@ -812,26 +799,7 @@ if (str_par_vals['ctsk'] in ("input", "inputrun", "all")):
             
             jobname = seedname + "_cut_1_kpn_" + str(i+2)
             
-            print "Creating files for job " + jobname
-            
-                        
-            icell = open(foldname + r'/' + jobname + '.cell', 'w')
-            iparam = open(foldname + r'/' + jobname + '.param', 'w')
-            
-            for l in stripped_cell: 
-                icell.write(l)
-            icell.write("\nkpoint_mp_grid " + kgrid(kpn) + "\n")
-            icell.close()
-            
-            iparam.write("task:\tSinglePoint\n")
-            iparam.write("cut_off_energy:\t" + str(cutrange[0]) + " eV\n")
-            for l in stripped_param: 
-                iparam.write(l)
-            if prev_jobname is not None and bool_par_vals["sruse"]:
-                iparam.write("reuse:\t" + prev_jobname + ".check\n")
-            if bool_par_vals["cnvstr"]:
-                iparam.write("calculate_stress:\ttrue\n")
-            iparam.close()
+            create_conv_folder(foldname, jobname, cutrange[0], kpn, prev_jobname)
             
             prev_jobname = jobname
             
@@ -880,7 +848,10 @@ if (str_par_vals["ctsk"] in ("all", "inputrun")):
                         cmd_line[j] = foldname
             # Note: subprocess.Popen opens a subprocess without waiting for it to finish.
             # In fact, if we don't take care to check that all files are closed (see later) they might as well not be and we might end with a crash
-            sp.Popen(cmd_line)
+            try:
+                sp.Popen(cmd_line)
+            except OSError:
+                sys.exit("ERROR - Command:\n>\t" + cmd_line[0] + "\ndoes not exist on this system")
             os.chdir("..")
             running_jobs.append([foldname, foldname])
             
@@ -921,7 +892,10 @@ if (str_par_vals["ctsk"] in ("all", "inputrun")):
                 for j, l in enumerate(cmd_line):
                     if l == "<seedname>":
                         cmd_line[j] = foldname
-            sp.Popen(cmd_line)
+            try:
+                sp.Popen(cmd_line)
+            except OSError:
+                sys.exit("ERROR - Command:\n>\t" + cmd_line[0] + "\ndoes not exist on this system")
             os.chdir("..")
             running_jobs.append([foldname, foldname])
             
@@ -991,7 +965,10 @@ if (str_par_vals["ctsk"] in ("all", "inputrun")):
                 for j, l in enumerate(cmd_line):
                     if l == "<seedname>":
                         cmd_line[j] = jobname
-            sp.Popen(cmd_line)
+            try:
+                sp.Popen(cmd_line)
+            except OSError:
+                sys.exit("ERROR - Command:\n>\t" + cmd_line[0] + "\ndoes not exist on this system")
             os.chdir("..")
             
             try:
@@ -1026,7 +1003,10 @@ if (str_par_vals["ctsk"] in ("all", "inputrun")):
                 for j, l in enumerate(cmd_line):
                     if l == "<seedname>":
                         cmd_line[j] = jobname
-            sp.Popen(cmd_line)
+            try:
+                sp.Popen(cmd_line)
+            except OSError:
+                sys.exit("ERROR - Command:\n>\t" + cmd_line[0] + "\ndoes not exist on this system")
             os.chdir("..")
             
             try:

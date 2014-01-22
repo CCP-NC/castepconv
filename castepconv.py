@@ -182,11 +182,16 @@ def parse_convfile(cfile):
             #Skip empty lines
             continue
         else:
-            cline = cline.lower().split(':')
+            cline = cline.split(':')
         if (len(cline) < 2):
             raise ConvError("Bad formatting in .conv file at line " + str(i))
-        par_name = cline[0].strip()
+        par_name = cline[0].strip().lower()
         if (par_name in str_par_names):
+            # A condition added to take into account weird command line instructions
+            if par_name == 'rcmd':
+                cline[1] = ':'.join(cline[1:])
+            else:
+                cline[1] = cline[1].lower()
             str_par_vals[str_par_names[par_name]] = cline[1].strip()
         elif (par_name in float_par_names):
             float_par_vals[float_par_names[par_name]] = float(cline[1])
@@ -755,8 +760,10 @@ if (str_par_vals['ctsk'] in ("input", "inputrun", "all")):
     # Open a .conv_tab file to keep track of the created files and folders. Will be read if output is done as a separate operation
     
     if os.path.isfile(seedname + ".conv_tab") and not ovwrite_files:
-        to_del = raw_input("Warning: " + seedname + ".conv_tab already exists. This file will be overwritten. Continue (y/N)?")
-        if to_del.lower() != 'y':
+        to_del = raw_input("Warning: " + seedname + ".conv_tab already exists. This file will be overwritten. Continue (y/N/y-all)?")
+        if to_del.lower() == 'y-all':
+            ovwrite_files = True
+        elif to_del.lower() != 'y':
             sys.exit("Aborting")
     
     conv_tab_file = open(seedname + ".conv_tab", 'w')

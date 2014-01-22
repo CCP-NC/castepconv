@@ -48,6 +48,12 @@ class OptError(Exception):
     def __str__(self):
         return self.value
 
+class PotError(Exception):
+    def __init__(self, value):
+        self.value = value
+    def __str__(self):
+        return self.value
+
 # Length units allowed by CASTEP. Internally used unit is always Angstroms 
 
 length_units = {'ang':1.0, 'm':1.0e10, 'cm':1.0e8, 'nm':10.0, 'bohr':0.529, 'a0':0.529}
@@ -125,6 +131,8 @@ kpnrange = None
 abc_len = None
 kpn_base = (1, 1, 1)
 pseudo_pots = None
+
+ovwrite_files = False
 
 __CASTEP_HEADER__       = "+-------------------------------------------------+"
 __CASTEP_TIME__         = "Total time          ="
@@ -268,9 +276,10 @@ def strip_cellfile(clines):
                         to_read_pot = False
                 else:
                     try:
-                        ppot.append((l_split[0], l_split[1]))
+                        ppot.append([l_split[0], l_split[1]])
                     except ValueError:
                         raise CellError('Bad formatting in .cell file SPECIES_POT block')
+                continue
             
             if "kpoints_mp_grid" in l_low:
                 continue
@@ -295,6 +304,7 @@ def strip_cellfile(clines):
                         raise CellError('Duplicated SPECIES_POT block in .cell file')                        
                     to_read_pot = True
                     ppot = []
+                    continue
             if to_strip:
                 if "%endblock" in l_low:
                     to_strip = False
@@ -404,12 +414,12 @@ def jobfinish_wait(foldname, jobname):
 
 def jobfinish_check(foldname, jobname):
     
-    if not os.path.isfile(foldname + r'/' + jobname + '.castep'):
+    if not os.path.isfile(os.path.join(foldname, jobname + '.castep')):
         return False
     # In case of errors, abort
-    if os.path.isfile(foldname + r'/' + jobname + '.0001.err'):
+    if os.path.isfile(os.path.join(foldname, jobname + '.0001.err')):
         raise JobError("Job " + jobname + " failed")
-    cast_file = open(foldname + r'/' + jobname + '.castep', 'r')
+    cast_file = open(os.path.join(foldname, jobname + '.castep'), 'r')
     cast_lines = cast_file.readlines()
     cast_lines.reverse()
     cast_file.close()
@@ -494,8 +504,7 @@ def parse_cmd_args():
 
 def create_conv_folder(foldname, jobname, cut, kpn, prev_jobname=None):
     
-    global ovwrite_files, stripped_cell, stripped_param, bool_par_vals, str_par_vals
-    
+    global ovwrite_files, stripped_cell, stripped_param, bool_par_vals, str_par_vals, pseudo_pots
     
     if not os.path.exists(foldname): 
         print "Creating folder " + foldname
@@ -509,11 +518,22 @@ def create_conv_folder(foldname, jobname, cut, kpn, prev_jobname=None):
             sys.exit("Aborting")
     
     print "Creating files for job " + jobname
-    icell = open(foldname + r'/' + jobname + '.cell', 'w')
-    iparam = open(foldname + r'/' + jobname + '.param', 'w')
+    icell = open(os.path.join(foldname, jobname + '.cell'), 'w')
+    iparam = open(os.path.join(foldname, jobname + '.param'), 'w')
     
-    for l in stripped_cell: 
+    for l in stripped_cell:
         icell.write(l)
+    
+    # Write pseudopotentials block
+    
+    if pseudo_pots is not None and len(pseudo_pots) > 0:
+        icell.write("%BLOCK SPECIES_POT\n")
+        for p in pseudo_pots:
+            icell.write(p[0] + '\t' + p[1] + '\n')
+        icell.write("%ENDBLOCK SPECIES_POT\n")
+    
+    # Write kpoint grid
+    
     icell.write("\nkpoint_mp_grid " + kgrid(kpn) + "\n")
     icell.close()
     
@@ -526,6 +546,46 @@ def create_conv_folder(foldname, jobname, cut, kpn, prev_jobname=None):
     if bool_par_vals["cnvstr"]:
         iparam.write("calculate_stress:\ttrue\n")
     iparam.close()
+
+# Find and if needed copy the pseudo potential files
+
+def find_pseudopots(seedname, pseudo_pots):
+    
+    global ovwrite_files
+    
+    # First: check whether there are pseudo pots at all
+        
+    if (pseudo_pots is None) or (len(pseudo_pots) == 0):
+        return
+    
+    pp_folder = seedname + "_pspot"
+    
+    # Second: check whether a system path for pseudopotentials is indicated
+    
+    try:
+        default_path = os.environ['PSPOT_DIR']
+    except KeyError:
+        default_path = None
+    
+    # Third: check whether the pseudopotentials do indeed exist and update their paths
+    
+    for i in range(0, len(pseudo_pots)):
+        
+        if default_path is None or not os.path.isfile(os.path.join(default_path, pseudo_pots[i][1])):
+            if os.path.isfile(pseudo_pots[i][1]):
+                if not os.path.exists(pp_folder):
+                    os.makedirs(pp_folder)
+                elif not ovwrite_files:
+                    to_del = raw_input("Warning: folder " + pp_folder + " already exists. \
+                    \nSome files might be overwritten. Continue (y/N/y-all)?")
+                    if to_del.lower() == 'y-all':
+                        ovwrite_files = True
+                    elif to_del.lower() != 'y':
+                        sys.exit("Aborting")
+                shutil.copy2(pseudo_pots[i][1], os.path.join(pp_folder, pseudo_pots[i][1]))
+                pseudo_pots[i][1] = os.path.join('..', pp_folder, pseudo_pots[i][1])
+            else:
+                raise PotError("Pseudo potential file " + pseudo_pots[i][1] + " could not be found")
 
 ###### -- MAIN PROGRAM -- ######
 
@@ -598,6 +658,8 @@ if (str_par_vals['ctsk'] in ("clear")):
     
     if os.path.exists(seedname + "_conv"):
         to_del_fold += [seedname + "_conv"]
+    if os.path.exists(seedname + "_pspot"):
+        to_del_fold += [seedname + "_pspot"]
     
     # Create a list of files to delete
     
@@ -665,6 +727,13 @@ if (str_par_vals['ctsk'] in ("input", "inputrun", "all")):
     else:
         stripped_param = []
     
+    # Check the positions and existence of pseudopotentials
+    
+    try:
+        find_pseudopots(seedname, pseudo_pots)
+    except PotError as PE:
+        sys.exit("ERROR - " + str(PE))
+    
     # Apply displacements to .cell atoms if needed to have non-zero forces
     
     if float_par_vals["displ"] > 0.0:
@@ -685,7 +754,7 @@ if (str_par_vals['ctsk'] in ("input", "inputrun", "all")):
     
     # Open a .conv_tab file to keep track of the created files and folders. Will be read if output is done as a separate operation
     
-    if os.path.isfile(seedname + ".conv_tab"):
+    if os.path.isfile(seedname + ".conv_tab") and not ovwrite_files:
         to_del = raw_input("Warning: " + seedname + ".conv_tab already exists. This file will be overwritten. Continue (y/N)?")
         if to_del.lower() != 'y':
             sys.exit("Aborting")
@@ -710,8 +779,6 @@ if (str_par_vals['ctsk'] in ("input", "inputrun", "all")):
     
     if len(old_kpnrange) > 0 and old_kpnrange[0] != kpnrange[0]:
         old_cutrange = []
-    
-    ovwrite_files = False
     
     if str_par_vals["rmode"] == "parallel":
         
@@ -1088,7 +1155,7 @@ if (str_par_vals["ctsk"] in ("all", "output")):
         else:
             foldname = jobname
                 
-        filepath = foldname + r'/' + jobname + '.castep'
+        filepath = os.path.join(foldname, jobname + '.castep')
         
         if not os.path.isfile(filepath):
             sys.exit("ERROR - File " + filepath + " not found. Please check the .conv file and that all calculations have actually finished")
@@ -1160,7 +1227,7 @@ if (str_par_vals["ctsk"] in ("all", "output")):
         else:
             foldname = jobname
         
-        filepath = foldname + r'/' + jobname + '.castep'
+        filepath = os.path.join(foldname, jobname + '.castep')
         
         if not os.path.isfile(filepath):
             sys.exit("ERROR - File " + filepath + " not found. Please check the .conv file and that all calculations have actually finished")

@@ -100,7 +100,7 @@ The accepted parameter names are listed in the subsections below.
 \textbf{converge\_stress}: Apply calculation of stresses to the simulations and then estimate convergence on stresses as well as energy and forces. Default is False.\newline
 \textit{Legal values}: Anything. The word ``true'', regardless of the case, means the stresses are calculated. Anything else will be interpreted as False.\newline
 
-\textbf{reuse\_calcs}: If results from a previous convergence are present, recycle them when possible. This requires the .conv\_tab file from the previous calculation to be unaltered. Default is False.\newline
+\textbf{reuse\_calcs}: If results from a previous convergence are present, recycle them when possible. Default is True.\newline
 \textit{Legal values}: Anything. The word ``true'', regardless of the case, means the stresses are calculated. Anything else will be interpreted as False.\newline
 
 \textbf{serial\_reuse}: When a serial convergence job is ran, include the keyword ``reuse'' in the .param files in order to make following calculations reuse the data from .check files from the previous ones. Turning this option off will make the jobs slower but may avoid crashes on some older versions of CASTEP. Default is True.\newline

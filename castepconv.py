@@ -116,7 +116,7 @@ bool_par_names = {
 
 bool_par_vals = {
 "cnvstr" : False,
-"rcalc"  : False,
+"rcalc"  : True,
 "sruse"  : True
 }
 
@@ -779,14 +779,6 @@ if (str_par_vals['ctsk'] in ("input", "inputrun", "all")):
     kpn_n = int(math.ceil(int_par_vals["kpnmax"]-int_par_vals["kpnmin"])/int_par_vals["kpnstep"])+1
     kpnrange = [tuple([(int_par_vals["kpnmin"] + i * int_par_vals["kpnstep"]) * e for e in kpn_base]) for i in range(0, kpn_n)]
     
-    # Avoid non repeating calculation which would have different 'lowest' value for cutoff/k points
-    
-    if len(old_cutrange) > 0 and old_cutrange[0] != cutrange[0]:
-        old_kpnrange = []
-    
-    if len(old_kpnrange) > 0 and old_kpnrange[0] != kpnrange[0]:
-        old_cutrange = []
-    
     if str_par_vals["rmode"] == "parallel":
         
         print "Creating folders for parallel convergence run"
@@ -797,17 +789,17 @@ if (str_par_vals['ctsk'] in ("input", "inputrun", "all")):
             
             conv_tab_file.write(str(cut) + " eV\t")
             
-            foldname = seedname + "_cut_" + str(i+1) + "_kpn_1"
+            foldname = seedname + "_cut_" + str(cut) + "_kpn_" + str(min(kpnrange[0]))
             
             # If we're reusing data, skip recreating the folder only if we already have some results
             
-            if cut in old_cutrange:
+            if bool_par_vals["rcalc"]:
                 try:
                     if jobfinish_check(foldname, foldname):
                         continue
                 except JobError:
                     pass
-            
+                
             create_conv_folder(foldname, foldname, cut, kpnrange[0])
             
         conv_tab_file.write("\n")
@@ -818,9 +810,9 @@ if (str_par_vals['ctsk'] in ("input", "inputrun", "all")):
             
             conv_tab_file.write(kgrid(kpn) + "\t|\t")
             
-            foldname = seedname + "_cut_1_kpn_" + str(i+2)
+            foldname = seedname + "_cut_" + str(cutrange[0]) + "_kpn_" + str(min(kpn))
             
-            if kpn in old_kpnrange:
+            if bool_par_vals["rcalc"]:
                 try:
                     if jobfinish_check(foldname, foldname):
                         continue
@@ -858,9 +850,9 @@ if (str_par_vals['ctsk'] in ("input", "inputrun", "all")):
             
             conv_tab_file.write(str(cut) + " eV\t")
             
-            jobname = seedname + "_cut_" + str(i+1) + "_kpn_1"
+            jobname = seedname + "_cut_" + str(cut) + "_kpn_" + str(min(kpnrange[0]))
             
-            if cut in old_cutrange:
+            if bool_par_vals["rcalc"]:
                 try:
                     if jobfinish_check(foldname, jobname):
                         continue
@@ -880,9 +872,9 @@ if (str_par_vals['ctsk'] in ("input", "inputrun", "all")):
             
             conv_tab_file.write(kgrid(kpn) + "\t|\t")
             
-            jobname = seedname + "_cut_1_kpn_" + str(i+2)
+            jobname = seedname + "_cut_" + str(cutrange[0]) + "_kpn_" + str(min(kpn))
             
-            if kpn in old_kpnrange:
+            if bool_par_vals["rcalc"]:
                 try:
                     if jobfinish_check(foldname, jobname):
                         continue
@@ -911,11 +903,11 @@ if (str_par_vals["ctsk"] in ("all", "inputrun")):
         
         for i, cut in enumerate(cutrange):
             
-            foldname = seedname + "_cut_" + str(i+1) + "_kpn_1"
+            foldname = seedname + "_cut_" + str(cut) + "_kpn_" + str(min(kpnrange[0]))
             
             # If we're reusing data, skip running only if we already have some results
             
-            if cut in old_cutrange:
+            if bool_par_vals["rcalc"]:
                 try:
                     if jobfinish_check(foldname, foldname):
                         continue
@@ -963,9 +955,9 @@ if (str_par_vals["ctsk"] in ("all", "inputrun")):
         
         for i, kpn in enumerate(kpnrange[1:]):
             
-            foldname = seedname + "_cut_1_kpn_" + str(i+2)
+            foldname = seedname + "_cut_" + str(cutrange[0]) + "_kpn_" + str(min(kpn))
             
-            if kpn in old_kpnrange:
+            if bool_par_vals["rcalc"]:
                 try:
                     if jobfinish_check(foldname, foldname):
                         continue
@@ -1017,14 +1009,14 @@ if (str_par_vals["ctsk"] in ("all", "inputrun")):
             WARNING: The program can be terminated with Ctrl+C, but that could terminate also the running jobs"
             
             for i, cut in enumerate(cutrange):
-                foldname = seedname + "_cut_" + str(i+1) + "_kpn_1"
+                foldname = seedname + "_cut_" + str(cut) + "_kpn_" + str(min(kpnrange[0]))
                 try:
                     jobfinish_wait(foldname, foldname)
                 except JobError as JE:
                     print "WARNING - " + str(JE)
                 
             for i, kpn in enumerate(kpnrange[1:]):
-                foldname = seedname + "_cut_1_kpn_" + str(i+2)
+                foldname = seedname + "_cut_" + str(cutrange[0]) + "_kpn_" + str(min(kpn))
                 try:
                     jobfinish_wait(foldname, foldname)
                 except JobError as JE:
@@ -1040,15 +1032,15 @@ if (str_par_vals["ctsk"] in ("all", "inputrun")):
         
         for i, cut in enumerate(cutrange):
             
-            jobname = seedname + "_cut_" + str(i+1) + "_kpn_1"
+            jobname = seedname + "_cut_" + str(cut) + "_kpn_" + str(min(kpnrange[0]))
             
-            if cut in old_cutrange:
+            if bool_par_vals["rcalc"]:
                 try:
                     if jobfinish_check(foldname, jobname):
                         continue
                 except JobError:
                     pass
-            
+                
             print "Running job with " + str(cut) + " eV cutoff"
             
             os.chdir(foldname)
@@ -1082,9 +1074,9 @@ if (str_par_vals["ctsk"] in ("all", "inputrun")):
                     
         for i, kpn in enumerate(kpnrange[1:]):
             
-            jobname = seedname + "_cut_1_kpn_" + str(i+2)
+            jobname = seedname + "_cut_" + str(cutrange[0]) + "_kpn_" + str(min(kpn))
             
-            if kpn in old_kpnrange:
+            if bool_par_vals["rcalc"]:
                 try:
                     if jobfinish_check(foldname, foldname):
                         continue
@@ -1155,7 +1147,7 @@ if (str_par_vals["ctsk"] in ("all", "output")):
     
     for i, cut in enumerate(cutrange):
         
-        jobname = seedname + "_cut_" + str(i+1) + "_kpn_1"
+        jobname = seedname + "_cut_" + str(cut) + "_kpn_" + str(min(kpnrange[0]))
         
         if (str_par_vals["rmode"] == "serial"):
             foldname = seedname + "_conv"
@@ -1227,7 +1219,7 @@ if (str_par_vals["ctsk"] in ("all", "output")):
     
     for i, kpn in enumerate(kpnrange[1:]):
         
-        jobname = seedname + "_cut_1_kpn_" + str(i+2)
+        jobname = seedname + "_cut_" + str(cutrange[0]) + "_kpn_" + str(min(kpn))
         
         if (str_par_vals["rmode"] == "serial"):
             foldname = seedname + "_conv"

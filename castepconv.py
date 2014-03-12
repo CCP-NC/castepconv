@@ -131,6 +131,7 @@ kpnrange = None
 abc_len = None
 kpn_base = (1, 1, 1)
 pseudo_pots = None
+has_fix_occ = False
 
 ovwrite_files = False
 
@@ -140,6 +141,7 @@ __CASTEP_ATOMN__        = "Total number of ions in cell = "
 __CASTEP_CUTOFF__       = "plane wave basis set cut-off                   :"
 __CASTEP_KPOINTS__      = "MP grid size for SCF calculation is"
 __CASTEP_ENERGY__       = "Final energy, E             ="
+__CASTEP_ENERGY_FIX__   = "Final energy ="                                                      
 __CASTEP_FORCES__       = "***************** Symmetrised Forces *****************"
 __CASTEP_FORCES_ALT__   = "*********************** Forces ***********************"
 __CASTEP_FORCES_END__   = "*                                                    *"
@@ -329,7 +331,7 @@ def strip_cellfile(clines):
 
 def strip_paramfile(plines):
     
-    global bool_par_vals
+    global bool_par_vals, has_fix_occ
     
     stripped = []
     
@@ -341,6 +343,9 @@ def strip_paramfile(plines):
         
         if len(l_split) == 0:
             continue
+        if "fix_occupancy" in l_split[0]:
+            if len(l_split) > 1 and l_split[1] == "true":
+                has_fix_occ = True
         if "task" in l_split[0]:
             continue
         if "cut_off_energy" in l_split[0]:
@@ -1179,8 +1184,10 @@ if (str_par_vals["ctsk"] in ("all", "output")):
                     cut_check = float(l.split()[6])
                 elif __CASTEP_KPOINTS__ in l:
                     kpn_check = tuple([int(x) for x in l.split()[7:]])
-                elif __CASTEP_ENERGY__ in l:
+                elif __CASTEP_ENERGY__ in l and not has_fix_occ:
                     i_nrg = float(l.split()[4])
+                elif __CASTEP_ENERGY_FIX__ in l and has_fix_occ:
+                    i_nrg = float(l.split()[3])
                 elif __CASTEP_FORCES__ in l or __CASTEP_FORCES_ALT__ in l:
                     i_for = parse_forces(castepfile[start_l+j:])
                 elif calc_str and (__CASTEP_STRESSES__ in l or __CASTEP_STRESSES_ALT__ in l):
@@ -1248,8 +1255,10 @@ if (str_par_vals["ctsk"] in ("all", "output")):
                     cut_check = float(l.split()[6])
                 elif __CASTEP_KPOINTS__ in l:
                     kpn_check = tuple([int(x) for x in l.split()[7:]])
-                elif __CASTEP_ENERGY__ in l:
+                elif __CASTEP_ENERGY__ in l and not has_fix_occ:
                     i_nrg = float(l.split()[4])
+                elif __CASTEP_ENERGY_FIX__ in l and has_fix_occ:
+                    i_nrg = float(l.split()[3])
                 elif __CASTEP_FORCES__ in l or __CASTEP_FORCES_ALT__ in l:
                     i_for = parse_forces(castepfile[start_l+j:])
                 elif calc_str and (__CASTEP_STRESSES__ in l or __CASTEP_STRESSES_ALT__ in l):

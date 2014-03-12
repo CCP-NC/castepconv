@@ -514,7 +514,7 @@ def create_conv_folder(foldname, jobname, cut, kpn, prev_jobname=None):
     if not os.path.exists(foldname): 
         print "Creating folder " + foldname
         os.makedirs(foldname)
-    elif not ovwrite_files:
+    elif not ovwrite_files and len(os.listdir(foldname)) > 0:
         to_del = raw_input("Warning: folder " + foldname + " already exists. \
         \nSome files might be overwritten. Continue (y/N/y-all)?")
         if to_del.lower() == 'y-all':

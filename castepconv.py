@@ -6,7 +6,7 @@
 # Copyright 2013 Science and Technology Facilities Council
 # This software is distributed under the terms of the GNU General Public License (GNU GPL)
 
-import sys, time, math, os, shutil, glob
+import sys, time, math, os, shutil, glob, re
 import subprocess as sp
 
 # Try importing argparse - if the Python version is too old, use optparse
@@ -579,9 +579,17 @@ def find_pseudopots(seedname, pseudo_pots):
     
     # Third: check whether the pseudopotentials do indeed exist and update their paths
     
+    pspotline_regex = re.compile("[0-9\.]+\|[0-9\.]+\|[0-9\.]+\|")
+    
     for i in range(0, len(pseudo_pots)):
         
         if default_path is None or not os.path.isfile(os.path.join(default_path, pseudo_pots[i][1])):
+            
+            # Exclude that pseudopotentials are just pseudopotential LINES
+            
+            if len(pspotline_regex.findall(pseudo_pots[i][1])) > 0:
+                continue
+            
             if os.path.isfile(pseudo_pots[i][1]):
                 if not os.path.exists(pp_folder):
                     os.makedirs(pp_folder)

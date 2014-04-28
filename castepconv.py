@@ -9,6 +9,8 @@
 import sys, time, math, os, shutil, glob, re
 import subprocess as sp
 
+__vers_number__ = "0.9.2"
+
 # Try importing argparse - if the Python version is too old, use optparse
 
 try:
@@ -640,6 +642,10 @@ seedname, cmdline_task = parse_cmd_args()
 
 if seedname is None:
     sys.exit("ERROR - <seedname> is a required argument")
+
+print "CASTEPconv v. " + __vers_number__ + "\n"
+print "by Simone Sturniolo"
+print "Copyright 2014 Science and Technology Facilities Council"
 
 # PHASE 0 - Check for existence of all required files and read the necessary information
 

@@ -539,7 +539,7 @@ def create_conv_folder(foldname, jobname, cut, kpn, prev_jobname=None):
         
         print "Copying submission script"
         
-        iscript = open(os.path.join(foldname, str_par_vals["subs"]), 'w')        
+        iscript = open(os.path.join(foldname, jobname), 'w')        
         for l in sscript:
             mod_l = l.replace('<seedname>', jobname)
             iscript.write(mod_l)

@@ -638,14 +638,14 @@ def compile_cmd_line(jname):
 if (sys.version_info[0] < 2 or sys.version_info[1] < 6):
     sys.exit("ERROR - Python version 2.6 or higher required to run the script")
 
+print "CASTEPconv v. " + __vers_number__ + "\n"
+print "by Simone Sturniolo"
+print "Copyright 2014 Science and Technology Facilities Council"
+
 seedname, cmdline_task = parse_cmd_args()
 
 if seedname is None:
     sys.exit("ERROR - <seedname> is a required argument")
-
-print "CASTEPconv v. " + __vers_number__ + "\n"
-print "by Simone Sturniolo"
-print "Copyright 2014 Science and Technology Facilities Council"
 
 # PHASE 0 - Check for existence of all required files and read the necessary information
 

@@ -65,6 +65,7 @@ str_par_names = {
 "running_mode"      : "rmode",
 "output_type"       :  "outp",
 "running_command"   : "rcmd",
+"submission_script" : "subs",
 }
 
 str_par_vals = {
@@ -72,6 +73,7 @@ str_par_vals = {
 "rmode"  : "parallel",                      # Can be PARALLEL or SERIAL
 "outp"   : "gnuplot",                       # Can be GNUPLOT or XMGRACE
 "rcmd"   : "castep <seedname> -dryrun",
+"subs"   : None,
 }
 
 float_par_names = {
@@ -132,6 +134,7 @@ abc_len = None
 kpn_base = (1, 1, 1)
 pseudo_pots = None
 has_fix_occ = False
+sscript = None
 
 ovwrite_files = False
 
@@ -189,9 +192,8 @@ def parse_convfile(cfile):
             raise ConvError("Bad formatting in .conv file at line " + str(i))
         par_name = cline[0].strip().lower()
         if (par_name in str_par_names):
-            # A condition added to take into account weird command line instructions
-            if par_name == 'rcmd':
-                cline[1] = ':'.join(cline[1:])
+            if str_par_names[par_name] == 'rcmd':
+                cline[1] = ' '.join(cline[1:])
             else:
                 cline[1] = cline[1].lower()
             str_par_vals[str_par_names[par_name]] = cline[1].strip()
@@ -514,7 +516,7 @@ def parse_cmd_args():
 
 def create_conv_folder(foldname, jobname, cut, kpn, prev_jobname=None):
     
-    global ovwrite_files, stripped_cell, stripped_param, bool_par_vals, str_par_vals, pseudo_pots
+    global ovwrite_files, stripped_cell, stripped_param, bool_par_vals, str_par_vals, pseudo_pots, sscript
     
     if not os.path.exists(foldname): 
         print "Creating folder " + foldname
@@ -531,6 +533,17 @@ def create_conv_folder(foldname, jobname, cut, kpn, prev_jobname=None):
     icell = open(os.path.join(foldname, jobname + '.cell'), 'w')
     iparam = open(os.path.join(foldname, jobname + '.param'), 'w')
     
+    if sscript is not None:
+        
+        print "Copying submission script"
+        
+        iscript = open(os.path.join(foldname, str_par_vals["subs"]), 'w')        
+        for l in sscript:
+            mod_l = l.replace('<seedname>', jobname)
+            iscript.write(mod_l)
+        iscript.flush()
+        iscript.close()
+            
     for l in stripped_cell:
         icell.write(l)
     
@@ -604,6 +617,19 @@ def find_pseudopots(seedname, pseudo_pots):
                 pseudo_pots[i][1] = os.path.join('..', pp_folder, pseudo_pots[i][1])
             else:
                 raise PotError("Pseudo potential file " + pseudo_pots[i][1] + " could not be found")
+
+def compile_cmd_line(jname):
+    
+    global str_par_vals
+    
+    cmd_line = str_par_vals["rcmd"].split()
+    
+    if "<seedname>" in cmd_line:
+        for j, l in enumerate(cmd_line):
+            if l == "<seedname>":
+                cmd_line[j] = jname
+                        
+    return cmd_line
 
 ###### -- MAIN PROGRAM -- ######
 
@@ -752,6 +778,15 @@ if (str_par_vals['ctsk'] in ("input", "inputrun", "all")):
     except PotError as PE:
         sys.exit("ERROR - " + str(PE))
     
+    # Check the existence of any eventual submission scripts
+    
+    if str_par_vals["subs"] is not None:
+        
+        if not os.path.isfile(str_par_vals["subs"]):
+            print "WARNING: submission script " + str_par_vals["subs"] + " not found, skipping"
+        else:
+            sscript = open(str_par_vals["subs"], 'r').readlines()
+        
     # Apply displacements to .cell atoms if needed to have non-zero forces
     
     if float_par_vals["displ"] > 0.0:
@@ -940,13 +975,8 @@ if (str_par_vals["ctsk"] in ("all", "inputrun")):
                 if os.path.isfile(foldname + ".0001.err"):
                     os.remove(foldname + ".0001.err")
             
-            cmd_line = str_par_vals["rcmd"].split()
-            if not "<seedname>" in cmd_line:
-                cmd_line.append(foldname)
-            else:
-                for j, l in enumerate(cmd_line):
-                    if l == "<seedname>":
-                        cmd_line[j] = foldname
+            cmd_line = compile_cmd_line(foldname)
+            
             # Note: subprocess.Popen opens a subprocess without waiting for it to finish.
             # In fact, if we don't take care to check that all files are closed (see later) they might as well not be and we might end with a crash
             try:
@@ -990,13 +1020,8 @@ if (str_par_vals["ctsk"] in ("all", "inputrun")):
                 if os.path.isfile(foldname + ".0001.err"):
                     os.remove(foldname + ".0001.err")
             
-            cmd_line = str_par_vals["rcmd"].split()
-            if not "<seedname>" in cmd_line:
-                cmd_line.append(foldname)
-            else:
-                for j, l in enumerate(cmd_line):
-                    if l == "<seedname>":
-                        cmd_line[j] = foldname
+            cmd_line = compile_cmd_line(foldname)
+            
             try:
                 sp.Popen(cmd_line)
             except OSError:
@@ -1067,13 +1092,8 @@ if (str_par_vals["ctsk"] in ("all", "inputrun")):
                 if os.path.isfile(jobname + ".0001.err"):
                     os.remove(jobname + ".0001.err")
             
-            cmd_line = str_par_vals["rcmd"].split()
-            if not "<seedname>" in cmd_line:
-                cmd_line.append(jobname)
-            else:
-                for j, l in enumerate(cmd_line):
-                    if l == "<seedname>":
-                        cmd_line[j] = jobname
+            cmd_line = compile_cmd_line(jobname)
+            
             try:
                 sp.Popen(cmd_line)
             except OSError:
@@ -1109,13 +1129,8 @@ if (str_par_vals["ctsk"] in ("all", "inputrun")):
                 if os.path.isfile(jobname + ".0001.err"):
                     os.remove(jobname + ".0001.err")
             
-            cmd_line = str_par_vals["rcmd"].split()
-            if not "<seedname>" in cmd_line:
-                cmd_line.append(jobname)
-            else:
-                for j, l in enumerate(cmd_line):
-                    if l == "<seedname>":
-                        cmd_line[j] = jobname
+            cmd_line = compile_cmd_line(jobname)
+            
             try:
                 sp.Popen(cmd_line)
             except OSError:

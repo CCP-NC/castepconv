@@ -9,7 +9,7 @@
 import sys, time, math, os, shutil, glob, re
 import subprocess as sp
 
-__vers_number__ = "0.9.2"
+__vers_number__ = "0.9.3"
 
 # Try importing argparse - if the Python version is too old, use optparse
 
@@ -196,7 +196,7 @@ def parse_convfile(cfile):
         if (par_name in str_par_names):
             if str_par_names[par_name] == 'rcmd':
                 cline[1] = ' '.join(cline[1:])
-            else:
+            elif str_par_names[par_name] != 'subs':  # If it IS subs, we don't need to alter it
                 cline[1] = cline[1].lower()
             str_par_vals[str_par_names[par_name]] = cline[1].strip()
         elif (par_name in float_par_names):
@@ -246,8 +246,10 @@ def strip_cellfile(clines):
     
     abc = None
     u = 1.0
-    kbase = (1, 1, 1)
+    kbase = [1, 1, 1]
     ppot = None
+    
+    hkl_data = []
     
     for l in clines:
         
@@ -261,23 +263,24 @@ def strip_cellfile(clines):
                     u = length_units[l_split[0]]
                 else: 
                     try:
-                        abc = [u*float(x) for x in l_split]
+                        hkl_data.append([u*float(x) for x in l_split])
                     except ValueError:
                         raise CellError('Bad formatting in .cell file LATTICE_ABC block')
-                    to_read_abc = False
+                    if (len(hkl_data) == 1):
+                        abc = tuple(hkl_data[0])
+                    to_read_abc = (len(hkl_data) < 2)                    
             if to_read_cart:
                 l_split = l_low.strip().split()
                 if l_split[0] in length_units:
                     u = length_units[l_split[0]]
                 else:
                     try:
-                        for i in range(0, 3):
-                            if abc[i] < 0:
-                                abc[i] = math.sqrt(sum([(u*float(x))**2.0 for x in l_split]))
-                                break
+                        hkl_data.append([u*float(x) for x in l_split])
                     except ValueError:
                         raise CellError('Bad formatting in .cell file LATTICE_CART block')
-                    to_read_cart = (min(abc) < 0.0)
+                    if (len(hkl_data) == 3):
+                        abc = tuple([math.sqrt(sum([x**2.0 for x in hkl])) for hkl in hkl_data])
+                    to_read_cart = (len(hkl_data) < 3)
             if to_read_pot:
                 l_split = l.strip().split()
                 if "%endblock" in l_low:
@@ -326,10 +329,16 @@ def strip_cellfile(clines):
     if abc is None:
         raise CellError('.cell file does not contain a LATTICE_* block')
     
-    max_e = max(abc)
-    kbase = tuple([int(max_e/x) for x in abc])
+    if len(hkl_data) == 2:
+        for i in range(0, 3):
+            kbase[i] = hkl_data[0][i-1]*hkl_data[0][i-2]*math.sin(hkl_data[1][i])
+    elif len(hkl_data) == 3:
+        for i in range(0, 3):
+            kbase[i] = math.sqrt(sum([(hkl_data[i-2][j-2]*hkl_data[i-1][j-1] - hkl_data[i-2][j-1]*hkl_data[i-1][j-2])**2.0 for j in range(0, 3)]))
     
-    return stripped, tuple(abc), kbase, ppot
+    kbase = tuple([k/min(kbase) for k in kbase])    
+    
+    return stripped, abc, kbase, ppot
 
 # Strip .param file from unnecessary lines to get only the ones we care for (i.e. remove all reference to task and cutoff)
 
@@ -572,6 +581,71 @@ def create_conv_folder(foldname, jobname, cut, kpn, prev_jobname=None):
         iparam.write("calculate_stress:\ttrue\n")
     iparam.close()
 
+# Run a job, eventually wait for its completion, etc.
+
+def job_run(foldname, jobname, running_jobs=None):
+    
+    global bool_par_vals, int_par_vals
+    
+    if bool_par_vals["rcalc"]:
+        try:
+            if jobfinish_check(foldname, jobname):
+                return
+        except JobError:
+            pass
+        
+    os.chdir(foldname)
+    
+    if os.path.isfile(jobname + ".castep") or os.path.isfile(jobname + ".check") or os.path.isfile(jobname + ".0001.err"):
+        print "Removing output files from previous jobs for " + jobname
+        if os.path.isfile(jobname + ".castep"):
+            os.remove(jobname + ".castep")
+        if os.path.isfile(jobname + ".check"):
+            os.remove(jobname + ".check")
+        if os.path.isfile(jobname + ".0001.err"):
+            os.remove(jobname + ".0001.err")
+    
+    cmd_line, stdin_file, stdout_file = compile_cmd_line(jobname)
+                
+    if (stdin_file is not None):
+        if os.path.isfile(stdin_file):
+            stdin_file = open(stdin_file, 'r')
+        else:
+            sys.exit("ERROR - STDIN redirected from inexistent file " + stdin_file)                        
+    if (stdout_file is not None):
+        stdout_file = open(stdout_file, 'w')
+        
+    try:
+        sp.Popen(cmd_line, stdin=stdin_file, stdout=stdout_file)
+    except OSError:
+        sys.exit("ERROR - Command:\n>\t" + cmd_line[0] + "\ndoes not exist on this system")
+    os.chdir("..")
+    if (running_jobs is not None):
+        running_jobs.append([foldname, jobname])
+    
+    if(stdin_file is not None):
+        stdin_file.close()
+    if(stdout_file is not None):
+        stdout_file.close()
+    
+    if (running_jobs is not None):
+        # PARALLEL operation case
+        if int_par_vals["maxjobs"] > 0:
+                    while len(running_jobs) >= int_par_vals["maxjobs"]:
+                        for job_ind in range(len(running_jobs)-1, -1, -1):
+                            try:
+                                if jobfinish_check(running_jobs[job_ind][0], running_jobs[job_ind][1]):
+                                    del running_jobs[job_ind]
+                            except JobError as JE:
+                                del running_jobs[job_ind]
+                                print "WARNING - " + str(JE)
+    else:
+        # SERIAL operation case
+        try:
+            jobfinish_wait(foldname, jobname)
+        except JobError as JE:
+            print "WARNING - " + str(JE)
+
 # Find and if needed copy the pseudo potential files
 
 def find_pseudopots(seedname, pseudo_pots):
@@ -624,14 +698,26 @@ def compile_cmd_line(jname):
     
     global str_par_vals
     
-    cmd_line = str_par_vals["rcmd"].split()
+    cmd_line = str_par_vals["rcmd"]
     
-    if "<seedname>" in cmd_line:
-        for j, l in enumerate(cmd_line):
-            if l == "<seedname>":
-                cmd_line[j] = jname
-                        
-    return cmd_line
+    # Check for redirections 
+    
+    stdin_file = None
+    stdout_file = None
+    
+    cmd_line = cmd_line.replace('<seedname>', jname)
+    
+    if ('<' in cmd_line):
+        # Take the last of the filenames given after a < but before a >
+        stdin_file = cmd_line.split('<')[-1].split('>')[0].split()[-1]
+    
+    if ('>' in cmd_line):
+        # Take the last of the filenames given after a > but before a <
+        stdout_file = cmd_line.split('>')[-1].split('<')[0].split()[-1]
+    
+    cmd_line = cmd_line.split('<')[0].split('>')[0].split()
+    
+    return cmd_line, stdin_file, stdout_file
 
 ###### -- MAIN PROGRAM -- ######
 
@@ -831,7 +917,7 @@ if (str_par_vals['ctsk'] in ("input", "inputrun", "all")):
     cutrange = [float_par_vals["cutmin"] + i * float_par_vals["cutstep"] for i in range(0, cut_n)]
         
     kpn_n = int(math.ceil(int_par_vals["kpnmax"]-int_par_vals["kpnmin"])/int_par_vals["kpnstep"])+1
-    kpnrange = [tuple([(int_par_vals["kpnmin"] + i * int_par_vals["kpnstep"]) * e for e in kpn_base]) for i in range(0, kpn_n)]
+    kpnrange = [tuple([int((int_par_vals["kpnmin"] + i * int_par_vals["kpnstep"]) * e) for e in kpn_base]) for i in range(0, kpn_n)]
     
     if str_par_vals["rmode"] == "parallel":
         
@@ -959,91 +1045,17 @@ if (str_par_vals["ctsk"] in ("all", "inputrun")):
             
             foldname = seedname + "_cut_" + str(cut) + "_kpn_" + str(min(kpnrange[0]))
             
-            # If we're reusing data, skip running only if we already have some results
-            
-            if bool_par_vals["rcalc"]:
-                try:
-                    if jobfinish_check(foldname, foldname):
-                        continue
-                except JobError:
-                    pass
-            
             print "Running job " + foldname
             
-            os.chdir(foldname)
-            
-            if os.path.isfile(foldname + ".castep") or os.path.isfile(foldname + ".check") or os.path.isfile(foldname + ".0001.err"):
-                print "Removing output files from previous jobs for " + foldname
-                if os.path.isfile(foldname + ".castep"):
-                    os.remove(foldname + ".castep")
-                if os.path.isfile(foldname + ".check"):
-                    os.remove(foldname + ".check")
-                if os.path.isfile(foldname + ".0001.err"):
-                    os.remove(foldname + ".0001.err")
-            
-            cmd_line = compile_cmd_line(foldname)
-            
-            # Note: subprocess.Popen opens a subprocess without waiting for it to finish.
-            # In fact, if we don't take care to check that all files are closed (see later) they might as well not be and we might end with a crash
-            try:
-                sp.Popen(cmd_line)
-            except OSError:
-                sys.exit("ERROR - Command:\n>\t" + cmd_line[0] + "\ndoes not exist on this system")
-            os.chdir("..")
-            running_jobs.append([foldname, foldname])
-            
-            if int_par_vals["maxjobs"] > 0:
-                while len(running_jobs) >= int_par_vals["maxjobs"]:
-                    for job_ind in range(len(running_jobs)-1, -1, -1):
-                        try:
-                            if jobfinish_check(running_jobs[job_ind][0], running_jobs[job_ind][1]):
-                                del running_jobs[job_ind]
-                        except JobError as JE:
-                            del running_jobs[job_ind]
-                            print "WARNING - " + str(JE)
+            job_run(foldname, foldname, running_jobs)
         
         for i, kpn in enumerate(kpnrange[1:]):
             
             foldname = seedname + "_cut_" + str(cutrange[0]) + "_kpn_" + str(min(kpn))
             
-            if bool_par_vals["rcalc"]:
-                try:
-                    if jobfinish_check(foldname, foldname):
-                        continue
-                except JobError:
-                    pass
-            
             print "Running job " + foldname
             
-            os.chdir(foldname)
-            
-            if os.path.isfile(foldname + ".castep") or os.path.isfile(foldname + ".check") or os.path.isfile(foldname + ".0001.err"):
-                print "Removing output files from previous jobs for " + foldname
-                if os.path.isfile(foldname + ".castep"):
-                    os.remove(foldname + ".castep")
-                if os.path.isfile(foldname + ".check"):
-                    os.remove(foldname + ".check")
-                if os.path.isfile(foldname + ".0001.err"):
-                    os.remove(foldname + ".0001.err")
-            
-            cmd_line = compile_cmd_line(foldname)
-            
-            try:
-                sp.Popen(cmd_line)
-            except OSError:
-                sys.exit("ERROR - Command:\n>\t" + cmd_line[0] + "\ndoes not exist on this system")
-            os.chdir("..")
-            running_jobs.append([foldname, foldname])
-            
-            if int_par_vals["maxjobs"] > 0:
-                while len(running_jobs) >= int_par_vals["maxjobs"]:
-                    for job_ind in range(len(running_jobs)-1, -1, -1):
-                        try:
-                            if jobfinish_check(running_jobs[job_ind][0], running_jobs[job_ind][1]):
-                                del running_jobs[job_ind]
-                        except JobError as JE:
-                            del running_jobs[job_ind]
-                            print "WARNING - " + str(JE)
+            job_run(foldname, foldname, running_jobs)
             
         # If we're running an ALL job, wait for everyone to finish
         
@@ -1077,76 +1089,18 @@ if (str_par_vals["ctsk"] in ("all", "inputrun")):
         for i, cut in enumerate(cutrange):
             
             jobname = seedname + "_cut_" + str(cut) + "_kpn_" + str(min(kpnrange[0]))
-            
-            if bool_par_vals["rcalc"]:
-                try:
-                    if jobfinish_check(foldname, jobname):
-                        continue
-                except JobError:
-                    pass
-                
+               
             print "Running job with " + str(cut) + " eV cutoff"
             
-            os.chdir(foldname)
-            
-            if os.path.isfile(jobname + ".castep") or os.path.isfile(jobname + ".check") or os.path.isfile(jobname + ".0001.err"):
-                print "Removing output files from previous jobs for " + jobname
-                if os.path.isfile(jobname + ".castep"):
-                    os.remove(jobname + ".castep")
-                if os.path.isfile(jobname + ".check"):
-                    os.remove(jobname + ".check")
-                if os.path.isfile(jobname + ".0001.err"):
-                    os.remove(jobname + ".0001.err")
-            
-            cmd_line = compile_cmd_line(jobname)
-            
-            try:
-                sp.Popen(cmd_line)
-            except OSError:
-                sys.exit("ERROR - Command:\n>\t" + cmd_line[0] + "\ndoes not exist on this system")
-            os.chdir("..")
-            
-            try:
-                jobfinish_wait(foldname, jobname)
-            except JobError as JE:
-                print "WARNING - " + str(JE)
+            job_run(foldname, jobname)
                     
         for i, kpn in enumerate(kpnrange[1:]):
             
             jobname = seedname + "_cut_" + str(cutrange[0]) + "_kpn_" + str(min(kpn))
             
-            if bool_par_vals["rcalc"]:
-                try:
-                    if jobfinish_check(foldname, foldname):
-                        continue
-                except JobError:
-                    pass
-            
             print "Running job with kpoint grid " + kgrid(kpn)
             
-            os.chdir(foldname)
-            
-            if os.path.isfile(jobname + ".castep") or os.path.isfile(jobname + ".check") or os.path.isfile(jobname + ".0001.err"):
-                print "Removing output files from previous jobs for " + jobname
-                if os.path.isfile(jobname + ".castep"):
-                    os.remove(jobname + ".castep")
-                if os.path.isfile(jobname + ".check"):
-                    os.remove(jobname + ".check")
-                if os.path.isfile(jobname + ".0001.err"):
-                    os.remove(jobname + ".0001.err")
-            
-            cmd_line = compile_cmd_line(jobname)
-            
-            try:
-                sp.Popen(cmd_line)
-            except OSError:
-                sys.exit("ERROR - Command:\n>\t" + cmd_line[0] + "\ndoes not exist on this system")
-            os.chdir("..")
-            
-            try:
-                jobfinish_wait(foldname, jobname)
-            except JobError as JE:
-                print "WARNING - " + str(JE)
+            job_run(foldname, jobname)
         
         if str_par_vals["ctsk"] == "all":
             print "\n -- All jobs finished. Proceeding to analyze output --\n"
@@ -1163,7 +1117,7 @@ if (str_par_vals["ctsk"] in ("all", "output")):
         cutrange = [float_par_vals["cutmin"] + i * float_par_vals["cutstep"] for i in range(0, cut_n)]
         
         kpn_n = int(math.ceil(int_par_vals["kpnmax"]-int_par_vals["kpnmin"])/int_par_vals["kpnstep"])+1
-        kpnrange = [tuple([(int_par_vals["kpnmin"] + i * int_par_vals["kpnstep"]) * e for e in kpn_base]) for i in range(0, kpn_n)]
+        kpnrange = [tuple([int((int_par_vals["kpnmin"] + i * int_par_vals["kpnstep"]) * e) for e in kpn_base]) for i in range(0, kpn_n)]
         
         if os.path.isfile(seedname + ".conv_tab"):
             cutrange, kpnrange = parse_conv_tab_file(open(seedname + ".conv_tab", 'r'))

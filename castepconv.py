@@ -72,7 +72,7 @@ str_par_names = {
 
 str_par_vals = {
 "ctsk"   : "input",                         # Can be INPUT, INPUTRUN, OUTPUT or ALL
-"rmode"  : "parallel",                      # Can be PARALLEL or SERIAL
+"rmode"  : "serial",                        # Can be PARALLEL or SERIAL
 "outp"   : "gnuplot",                       # Can be GNUPLOT or XMGRACE
 "rcmd"   : "castep <seedname> -dryrun",
 "subs"   : None,

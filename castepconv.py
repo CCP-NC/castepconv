@@ -532,7 +532,7 @@ def create_conv_folder(foldname, jobname, cut, kpn, prev_jobname=None):
     if not os.path.exists(foldname): 
         print "Creating folder " + foldname
         os.makedirs(foldname)
-    elif not ovwrite_files and len(os.listdir(foldname)) > 0:
+    elif not ovwrite_files and len(os.listdir(foldname)) > 0 and prev_jobname is None:
         to_del = raw_input("Warning: folder " + foldname + " already exists. \
         \nSome files might be overwritten. Continue (y/N/y-all)?")
         if to_del.lower() == 'y-all':
@@ -971,6 +971,8 @@ if (str_par_vals['ctsk'] in ("input", "inputrun", "all")):
         foldname = seedname + "_conv"
         
         print "Creating folder " + foldname + " for serial convergence run"
+        
+        # Check whether the folder exists from previous jobs or you're just creating it now...
         
         if not os.path.exists(foldname): 
             os.makedirs(foldname)

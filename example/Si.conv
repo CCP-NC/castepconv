@@ -1,0 +1,26 @@
+# The fundamental parameters: 'all' means the script will create input files, run the simulations and process the output, while running_command is the command that needs to be executed in order to actually run the simulations.
+# If you need to change it remember to keep the <seedname> tag in the right place.
+
+convergence_task: all
+running_command: castep.serial <seedname>
+
+# These parameters, if uncommented, allow you to control the range of cutoff energies and kpoints for your convergence
+#
+# cutoff_min:     200
+# cutoff_max:     400
+# kpoint_n_min:   1
+# kpoint_n_max:   3
+
+# Here if you want to converge stresses as well
+#
+# converge_stress: true
+
+# This allows you to displace slightly the atoms from their equilibrium positions in order to introduce a non-zero force to converge in the system
+#
+# displace_atoms: 0.05
+
+# The job is run by default in 'serial' mode, i.e., one job waits for the one before to finish.
+# You can use parallel threads to run multiple jobs but be careful - keep the maximum number reasonable for the cores of your processor or you'll risk incurring in a slow down.
+#
+# running_mode: parallel
+# max_parallel_jobs: 2

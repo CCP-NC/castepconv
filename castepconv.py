@@ -721,7 +721,7 @@ def compile_cmd_line(jname):
 
 ###### -- MAIN PROGRAM -- ######
 
-if (sys.version_info[0] < 2 or sys.version_info[1] < 6):
+if (sys.version_info[0] < 2 or (sys.version_info[0] == 2 and sys.version_info[1] < 6)):
     sys.exit("ERROR - Python version 2.6 or higher required to run the script")
 
 print "CASTEPconv v. " + __vers_number__ + "\n"

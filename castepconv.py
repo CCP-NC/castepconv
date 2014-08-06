@@ -965,8 +965,8 @@ if (str_par_vals['ctsk'] in ("input", "inputrun", "all")):
         
     elif str_par_vals["rmode"] == "serial":
                 
-        if str_par_vals["ctsk"] == "input":
-            sys.exit("ERROR - Impossible to carry out a SERIAL convergence test for an INPUT task. SERIAL tests require the execution step to be automated")
+        #if str_par_vals["ctsk"] == "input":
+        #    sys.exit("ERROR - Impossible to carry out a SERIAL convergence test for an INPUT task. SERIAL tests require the execution step to be automated")
         
         foldname = seedname + "_conv"
         
@@ -1009,6 +1009,9 @@ if (str_par_vals['ctsk'] in ("input", "inputrun", "all")):
         conv_tab_file.write("\n")
             
         conv_tab_file.write("kpoint_n:\t" + kgrid(kpnrange[0]) + "\t|\t")
+
+        # Here we restart reusing from the first job...
+        prev_jobname = seedname + "_cut_" + str(cutrange[0]) + "_kpn_" + str(min(kpnrange[0]))
         
         for i, kpn in enumerate(kpnrange[1:]):
             

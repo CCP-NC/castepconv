@@ -223,5 +223,47 @@ different convergence criteria. Whenever no convergence is found, or the values
 examined are too small to be sure of their reliability, a warning message is 
 issued.
 
+\section{Getting Started}
+
+In this section we'll go through a quick tutorial to getting started with CASTEPconv, by using the silicon example provided with the code. Even when the example includes running calculations, they should be fairly simple even for a desktop computer. If you are using an especially old or slow machine, please skip those parts.\newline
+In order to run the example, just enter the console, move to the \textit{castepconv/example} folder and edit the \textit{Si.conv} file with a text editor. Replace the line
+
+\begin{lstlisting}
+ running_command: castep.serial <seedname>
+\end{lstlisting}
+
+with whatever the name/path of castep on your system is (remember to keep the \textless \textit{seedname}\textgreater part untouched though). After doing that, you can just use the command
+
+\begin{lstlisting}
+ user@machine:~$ castepconv.py Si
+\end{lstlisting}
+
+to run the convergence. Just sit back and wait. At the end of the process, after a few minutes, some output files should have been produced. The ones of interest are \textit{Si\_cut\_conv.dat, Si\_cut\_conv.gp, Si\_kpn\_conv.dat} and \textit{Si\_kpn\_conv.gp}. The two .dat files contain tabulated results for energy and forces by varying, respectively, cutoff and k-point grid; the two .gp files are scripts for Gnuplot plotting of the same data sets. If you have gnuplot installed they can be visualized for example with:
+
+\begin{lstlisting}
+ user@machine:~$ gnuplot Si_cut_conv.gp
+\end{lstlisting}
+
+If you plot the data, you will notice that the line for the ``force'' is completely flat. This happens because the \textit{Si.cell} file used describes a perfectly equilibrated structure, and in a system in equilibrium, forces are always zero. In order to change this we need to upset this equilibrium a bit. To do so go back to editing the \textit{Si.conv} file and uncomment (remove the hash, \#, from the beginning) the line
+
+\begin{lstlisting}
+displace_atoms: 0.05
+\end{lstlisting}
+
+which will shift all atoms by $0.05 $\AA{} in a random direction, enough to give rise to non zero forces. Now rerun the calculation, and when prompted, answer to overwrite the old files. At the end you will be able to see the convergence of forces as well.\newline
+If instead you'd like to run everything by hand and let CASTEPconv handle only the input generation and the output postprocessing, that is possible too. First let's clean up the current folder structure by issuing the command
+
+\begin{lstlisting}
+ user@machine:~$ castepconv.py -t c Si
+\end{lstlisting}
+
+which replaces the current task (\textit{all}) with \textit{clean}, namely, delete all generated files and folders. Then edit the \textit{Si.conv} file and uncomment the following lines:
+
+\begin{lstlisting}
+running_mode: parallel
+\end{lstlisting}
+
+and either replace \textit{convergence\_task} with \textit{input} and run normally, or run with the option \textit{-t i}. In this way, a structure of folders will be generated, containing the starting files for the various points of the convergence calculations. This could be done with the \textit{serial} running mode as well, but in that case everything would be placed in a single folder and you would need to run the tasks in a specific order for the calculations to succeed (as every calculation in that case reuses the results from the previous one as a starting point in order to improve its performance). After generating the folders, visit each one of them and run the CASTEP calculation normally. When all calculations are finished, go back in the parent folder and either change \textit{convergence\_task} with \textit{output} and run normally or run with the option \textit{-t o} in order to get the output postprocessed - as an outcome, you will get the same data files and plots as in the first run.
+
 \end{document}
 

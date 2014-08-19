@@ -606,7 +606,7 @@ def job_run(foldname, jobname, running_jobs=None):
             os.remove(jobname + ".0001.err")
     
     cmd_line, stdin_file, stdout_file = compile_cmd_line(jobname)
-                
+    
     if (stdin_file is not None):
         if os.path.isfile(stdin_file):
             stdin_file = open(stdin_file, 'r')
@@ -697,7 +697,7 @@ def find_pseudopots(seedname, pseudo_pots):
 def compile_cmd_line(jname):
     
     global str_par_vals
-    
+
     cmd_line = str_par_vals["rcmd"]
     
     # Check for redirections 

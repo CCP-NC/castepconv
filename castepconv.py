@@ -350,7 +350,7 @@ def strip_paramfile(plines):
     
     for l in plines:
         
-        l_split = l.strip().lower().split()
+        l_split = l.replace(':', ' ').replace('=', ' ').strip().lower().split()
         
         # Skip empty lines
         

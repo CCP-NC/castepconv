@@ -6,10 +6,12 @@ running_command: castep.serial <seedname>
 
 # These parameters, if uncommented, allow you to control the range of cutoff energies and kpoints for your convergence
 #
-# cutoff_min:     200
-# cutoff_max:     400
+# cutoff_min:     100
+# cutoff_max:     300
+# cutoff_step:	  50
 # kpoint_n_min:   1
-# kpoint_n_max:   3
+# kpoint_n_max:   9
+# kpoint_n_step:  2
 
 # Here if you want to converge stresses as well
 #

@@ -65,11 +65,12 @@ length_units = {'ang':1.0, 'm':1.0e10, 'cm':1.0e8, 'nm':10.0, 'bohr':0.529, 'a0'
 # Parameters from CONV files - names and values
 
 str_par_names = {
-"convergence_task"  : "ctsk",
-"running_mode"      : "rmode",
-"output_type"       :  "outp",
-"running_command"   : "rcmd",
-"submission_script" : "subs",
+"convergence_task"      : "ctsk",
+"running_mode"          : "rmode",
+"output_type"           :  "outp",
+"running_command"       : "rcmd",
+"submission_script"     : "subs",
+"fine_grid_conv_mode"   : "fgmode",
 }
 
 str_par_vals = {
@@ -78,6 +79,7 @@ str_par_vals = {
 "outp"   : "gnuplot",                       # Can be GNUPLOT or XMGRACE
 "rcmd"   : "castep <seedname> -dryrun",
 "subs"   : None,
+"fgmode" : "None",
 }
 
 float_par_names = {
@@ -122,7 +124,7 @@ bool_par_names = {
 
 bool_par_vals = {
 "cnvstr" : False,
-"rcalc"  : True,
+"rcalc"  : False,
 "sruse"  : True
 }
 
@@ -159,6 +161,10 @@ __CASTEP_STRESSES_END__ = "*                                               *"
 # Just a useful snippet to return a kpoint grid from a 3-ple
 
 def kgrid(t): return str(t[0]) + '\t' + str(t[1]) + '\t' + str(t[2])
+
+# Another convenient snippet - this time to build a 'jobname'
+
+def jname(s, c, k): return s + "_cut_" + str(c) + "_kpn_" + str(min(k))
 
 # Another utility - find the LAST (rather than the first) occurrence that contains an element in a list
 
@@ -297,12 +303,11 @@ def strip_cellfile(clines):
                         raise CellError('Bad formatting in .cell file SPECIES_POT block')
                 continue
 
-            if "kpoints_mp_grid" in l_low:
-                continue
-            if "kpoints_mp_spacing" in l_low:
+            if any(kword in l_low for kword in ["kpoints_mp_grid", "kpoint_mp_grid",
+                "kpoints_mp_spacing", "kpoint_mp_spacing"]):
                 continue
             if "%block" in l_low:
-                if "kpoints_list" in l_low:
+                if "kpoints_list" in l_low or "kpoint_list" in l_low:
                     to_strip = True
                     continue
                 elif "lattice_abc" in l_low:
@@ -333,7 +338,7 @@ def strip_cellfile(clines):
 
     if len(hkl_data) == 2:
         for i in range(0, 3):
-            kbase[i] = hkl_data[0][i-1]*hkl_data[0][i-2]*math.sin(hkl_data[1][i])
+            kbase[i] = abs(hkl_data[0][i-1]*hkl_data[0][i-2]*math.sin(hkl_data[1][i]))
     elif len(hkl_data) == 3:
         for i in range(0, 3):
             kbase[i] = math.sqrt(sum([(hkl_data[i-2][j-2]*hkl_data[i-1][j-1] - hkl_data[i-2][j-1]*hkl_data[i-1][j-2])**2.0 for j in range(0, 3)]))
@@ -782,7 +787,9 @@ else:
 if cmdline_task is not None:
     str_par_vals['ctsk'] = {'c': 'clear', 'i': 'input', 'ir': 'inputrun', 'o': 'output', 'a': 'all'}[cmdline_task]
 
-if (str_par_vals['ctsk'] not in ("clear", "input", "inputrun", "output", "all")):
+try:
+    assert(str_par_vals['ctsk'] in ("clear", "input", "inputrun", "output", "all"))
+except AssertionError as e:
     sys.exit("ERROR - Invalid convergence_task parameter")
 
 # PHASE 0.5 - CLEAR
@@ -800,34 +807,16 @@ if (str_par_vals['ctsk'] in ("clear")):
         to_del_fold += [seedname + "_pspot"]
 
     # Create a list of files to delete
+    to_del_suffixes = [".conv_tab",
+        "_cut_conv.dat", "_kpn_conv.dat",
+        "_cut_conv.gp",  "_kpn_conv.gp",  "_cut_str_conv.gp",  "_kpn_str_conv.gp",
+        "_cut_conv.agr", "_kpn_conv.agr", "_cut_str_conv.agr", "_kpn_str_conv.agr"]   # A list of all possible files to delete
 
     to_del_files = []
 
-    if os.path.isfile(seedname + ".conv_tab"):
-        to_del_files += [seedname + ".conv_tab"]
-
-    if os.path.isfile(seedname + "_cut_conv.dat"):
-        to_del_files += [seedname + "_cut_conv.dat"]
-    if os.path.isfile(seedname + "_kpn_conv.dat"):
-        to_del_files += [seedname + "_kpn_conv.dat"]
-
-    if os.path.isfile(seedname + "_cut_conv.gp"):
-        to_del_files += [seedname + "_cut_conv.gp"]
-    if os.path.isfile(seedname + "_cut_str_conv.gp"):
-        to_del_files += [seedname + "_cut_str_conv.gp"]
-    if os.path.isfile(seedname + "_kpn_conv.gp"):
-        to_del_files += [seedname + "_kpn_conv.gp"]
-    if os.path.isfile(seedname + "_kpn_str_conv.gp"):
-        to_del_files += [seedname + "_kpn_str_conv.gp"]
-
-    if os.path.isfile(seedname + "_cut_conv.agr"):
-        to_del_files += [seedname + "_cut_conv.agr"]
-    if os.path.isfile(seedname + "_cut_str_conv.agr"):
-        to_del_files += [seedname + "_cut_str_conv.agr"]
-    if os.path.isfile(seedname + "_kpn_conv.agr"):
-        to_del_files += [seedname + "_kpn_conv.agr"]
-    if os.path.isfile(seedname + "_kpn_str_conv.agr"):
-        to_del_files += [seedname + "_kpn_str_conv.agr"]
+    for suff in to_del_suffixes:
+        if os.path.isfile(seedname + suff):
+            to_del_files += [seedname + suff]
 
     print "The following folders will be deleted:"
 
@@ -921,54 +910,33 @@ if (str_par_vals['ctsk'] in ("input", "inputrun", "all")):
     kpn_n = int(math.ceil(int_par_vals["kpnmax"]-int_par_vals["kpnmin"])/int_par_vals["kpnstep"])+1
     kpnrange = [tuple([int((int_par_vals["kpnmin"] + i * int_par_vals["kpnstep"]) * e) for e in kpn_base]) for i in range(0, kpn_n)]
 
+    # Build an array with the simulation conditions to employ condensed into one
+
+    allrange = []
+    conv_tab_file.write("cutoff:\t")
+    for cut in cutrange:
+        conv_tab_file.write(str(cut) + " eV\t")
+        allrange.append({'cut': cut, 'kpn': kpnrange[0]})
+    conv_tab_file.write("\nkpoint_n:\t" + kgrid(kpnrange[0]) + "\t|\t")
+    for kpn in kpnrange[1:]:
+        conv_tab_file.write(kgrid(kpn) + "\t|\t")
+        allrange.append({'cut': cutrange[0], 'kpn': kpn})
+    conv_tab_file.close()
+
+    foldname = None
+    jobname = None
+    prev_jobname = None
+
+    try:
+        assert(str_par_vals["rmode"] in ("serial", "parallel"))
+    except AssertionError as e:
+        sys.exit("ERROR - Invalid value for the running_mode parameter")
+
     if str_par_vals["rmode"] == "parallel":
 
         print "Creating folders for parallel convergence run"
 
-        conv_tab_file.write("cutoff:\t")
-
-        for i, cut in enumerate(cutrange):
-
-            conv_tab_file.write(str(cut) + " eV\t")
-
-            foldname = seedname + "_cut_" + str(cut) + "_kpn_" + str(min(kpnrange[0]))
-
-            # If we're reusing data, skip recreating the folder only if we already have some results
-
-            if bool_par_vals["rcalc"]:
-                try:
-                    if jobfinish_check(foldname, foldname):
-                        continue
-                except JobError:
-                    pass
-
-            create_conv_folder(foldname, foldname, cut, kpnrange[0])
-
-        conv_tab_file.write("\n")
-
-        conv_tab_file.write("kpoint_n:\t" + kgrid(kpnrange[0]) + "\t|\t")
-
-        for i, kpn in enumerate(kpnrange[1:]):
-
-            conv_tab_file.write(kgrid(kpn) + "\t|\t")
-
-            foldname = seedname + "_cut_" + str(cutrange[0]) + "_kpn_" + str(min(kpn))
-
-            if bool_par_vals["rcalc"]:
-                try:
-                    if jobfinish_check(foldname, foldname):
-                        continue
-                except JobError:
-                    pass
-
-            create_conv_folder(foldname, foldname, cutrange[0], kpn)
-
-        conv_tab_file.close()
-
     elif str_par_vals["rmode"] == "serial":
-
-        #if str_par_vals["ctsk"] == "input":
-        #    sys.exit("ERROR - Impossible to carry out a SERIAL convergence test for an INPUT task. SERIAL tests require the execution step to be automated")
 
         foldname = seedname + "_conv"
 
@@ -986,55 +954,30 @@ if (str_par_vals['ctsk'] in ("input", "inputrun", "all")):
             elif to_del.lower() != 'y':
                 sys.exit("Aborting")
 
-        conv_tab_file.write("cutoff:\t")
+    for pars in allrange:
 
-        prev_jobname = None
+        cut = pars['cut']
+        kpn = pars['kpn']
 
-        for i, cut in enumerate(cutrange):
+        jobname = jname(seedname, cut, kpn)
 
-            conv_tab_file.write(str(cut) + " eV\t")
+        if str_par_vals["rmode"] == "parallel":
+            foldname = jobname
 
-            jobname = seedname + "_cut_" + str(cut) + "_kpn_" + str(min(kpnrange[0]))
+        # If we're reusing data, skip recreating the folder only if we already have some results
 
-            if bool_par_vals["rcalc"]:
-                try:
-                    if jobfinish_check(foldname, jobname):
-                        continue
-                except JobError:
-                    pass
+        if bool_par_vals["rcalc"]:
+            try:
+                if jobfinish_check(foldname, jobname):
+                    continue
+            except JobError:
+                pass
 
-            create_conv_folder(foldname, jobname, cut, kpnrange[0], prev_jobname)
+        create_conv_folder(foldname, jobname, cut, kpn, prev_jobname)
 
+        if str_par_vals["rmode"] == "serial":
             prev_jobname = jobname
 
-        conv_tab_file.write("\n")
-
-        conv_tab_file.write("kpoint_n:\t" + kgrid(kpnrange[0]) + "\t|\t")
-
-        # Here we restart reusing from the first job...
-        prev_jobname = seedname + "_cut_" + str(cutrange[0]) + "_kpn_" + str(min(kpnrange[0]))
-
-        for i, kpn in enumerate(kpnrange[1:]):
-
-            conv_tab_file.write(kgrid(kpn) + "\t|\t")
-
-            jobname = seedname + "_cut_" + str(cutrange[0]) + "_kpn_" + str(min(kpn))
-
-            if bool_par_vals["rcalc"]:
-                try:
-                    if jobfinish_check(foldname, jobname):
-                        continue
-                except JobError:
-                    pass
-
-            create_conv_folder(foldname, jobname, cutrange[0], kpn, prev_jobname)
-
-            prev_jobname = jobname
-
-
-        conv_tab_file.close()
-    else:
-        sys.exit("ERROR - Invalid value for the running_mode parameter")
 
 # PHASE 2 - EXECUTION
 # Run through the files (or create them as we go if the task is serial) and obtain the results
@@ -1047,19 +990,13 @@ if (str_par_vals["ctsk"] in ("all", "inputrun")):
 
         running_jobs = []
 
-        for i, cut in enumerate(cutrange):
+        for pars in allrange:
 
-            foldname = seedname + "_cut_" + str(cut) + "_kpn_" + str(min(kpnrange[0]))
+            cut = pars['cut']
+            kpn = pars['kpn']
 
-            print "Running job " + foldname
-
-            job_run(foldname, foldname, running_jobs)
-
-        for i, kpn in enumerate(kpnrange[1:]):
-
-            foldname = seedname + "_cut_" + str(cutrange[0]) + "_kpn_" + str(min(kpn))
-
-            print "Running job " + foldname
+            foldname = jname(seedname, cut, kpn)
+            print "Running job " + jobname
 
             job_run(foldname, foldname, running_jobs)
 
@@ -1070,15 +1007,11 @@ if (str_par_vals["ctsk"] in ("all", "inputrun")):
             print "Waiting for all jobs to finish \
             WARNING: The program can be terminated with Ctrl+C, but that could terminate also the running jobs"
 
-            for i, cut in enumerate(cutrange):
-                foldname = seedname + "_cut_" + str(cut) + "_kpn_" + str(min(kpnrange[0]))
-                try:
-                    jobfinish_wait(foldname, foldname)
-                except JobError as JE:
-                    print "WARNING - " + str(JE)
+            for pars in allrange:
+                cut = pars['cut']
+                kpn = pars['kpn']
 
-            for i, kpn in enumerate(kpnrange[1:]):
-                foldname = seedname + "_cut_" + str(cutrange[0]) + "_kpn_" + str(min(kpn))
+                foldname = jname(seedname, cut, kpn)
                 try:
                     jobfinish_wait(foldname, foldname)
                 except JobError as JE:
@@ -1092,19 +1025,14 @@ if (str_par_vals["ctsk"] in ("all", "inputrun")):
 
         foldname = seedname + "_conv"
 
-        for i, cut in enumerate(cutrange):
+        for pars in allrange:
 
-            jobname = seedname + "_cut_" + str(cut) + "_kpn_" + str(min(kpnrange[0]))
+            cut = pars['cut']
+            kpn = pars['kpn']
 
-            print "Running job with " + str(cut) + " eV cutoff"
+            jobname = jname(seedname, cut, kpn)
 
-            job_run(foldname, jobname)
-
-        for i, kpn in enumerate(kpnrange[1:]):
-
-            jobname = seedname + "_cut_" + str(cutrange[0]) + "_kpn_" + str(min(kpn))
-
-            print "Running job with kpoint grid " + kgrid(kpn)
+            print "Running job " + jobname
 
             job_run(foldname, jobname)
 

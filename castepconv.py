@@ -135,6 +135,7 @@ paramfile_lines = None
 
 cutrange = None
 kpnrange = None
+allrange = None
 
 abc_len = None
 kpn_base = (1, 1, 1)
@@ -506,6 +507,101 @@ def parse_stresses(cfile):
 
     raise CastepError("Corrupted stresses block")
 
+# Parse a .castep file as a whole
+
+def parse_castep_file(cfile, filepath):
+
+    global bool_par_vals
+    global __CASTEP_ATOMN__, __CASTEP_CUTOFF__, __CASTEP_ENERGY_FIX__, __CASTEP_ENERGY__, __CASTEP_FORCES_ALT__
+    global __CASTEP_FORCES_END__, __CASTEP_FORCES__, __CASTEP_HEADER__, __CASTEP_KPOINTS__, __CASTEP_STRESSES_ALT__
+    global __CASTEP_STRESSES_ALT__, __CASTEP_STRESSES_END__, __CASTEP_STRESSES__
+
+    atom_n = None
+    i_nrg = None
+    i_for = None
+    i_str = None
+    cut_check = None
+    kpn_check = None
+
+    calc_str = bool_par_vals["cnvstr"]
+
+    start_l = rindex_cont(castepfile, __CASTEP_HEADER__)
+
+    for i, l in enumerate(castepfile[start_l:]):
+
+        try:
+            if __CASTEP_ATOMN__ in l and atom_n is None:
+                atom_n = int(l.split()[7])
+            elif __CASTEP_CUTOFF__ in l:
+                cut_check = float(l.split()[6])
+            elif __CASTEP_KPOINTS__ in l:
+                kpn_check = tuple([int(x) for x in l.split()[7:]])
+            elif __CASTEP_ENERGY__ in l and not has_fix_occ:
+                i_nrg = float(l.split()[4])
+            elif __CASTEP_ENERGY_FIX__ in l and has_fix_occ:
+                i_nrg = float(l.split()[3])
+            elif __CASTEP_FORCES__ in l or __CASTEP_FORCES_ALT__ in l:
+                i_for = parse_forces(castepfile[start_l+i:])
+            elif calc_str and (__CASTEP_STRESSES__ in l or __CASTEP_STRESSES_ALT__ in l):
+                i_str = parse_stresses(castepfile[start_l+i:])
+        except ValueError:
+            raise CastepError("Corrupted " + filepath + " file detected")
+        except CastepError as CE:
+            raise CE
+
+        if atom_n is not None and i_nrg is not None and i_for is not None and cut_check is not None and kpn_check is not None and ((calc_str and i_str is not None) or not calc_str):
+            break
+
+    return atom_n, i_nrg, i_for, i_str, cut_check, kpn_check
+
+# Find reasonable estimates for convergence values
+
+def conv_estimates(data, cnvstr=False):
+    
+    global float_par_vals
+
+    data_x = {'cut': ['cutoff', 'eV'], 'kpn': ['k-point grid', 'points']}
+    data_y = {'nrg': ['total energy', 'eV per atom'], 'for': ['maximum force', 'eV/Ang'], 'str': ['maximum stress', 'GPa']}
+    
+    print "Convergence results:"
+
+    for x in data:
+        x_name = data_x[x][0]
+        x_unit = data_x[x][1]
+        for y in data[x]:
+
+            if y in ('range', 'step'):
+                continue
+
+            if y == 'str' and not cnvstr:
+                continue
+             
+            dataset = data[x][y]
+            y_name = data_y[y][0]
+            y_unit = data_y[y][1]
+            tol = float_par_vals[y+"tol"]
+        
+            if len(dataset) < 2:
+                print "Impossible to give a convergence estimate with a single cutoff point"
+            elif tol <= 0.0:
+                print "Impossible to give a convergence estimate with a null or negative value for " + y_name + " tolerance"
+            else:
+        
+                delta = dataset[0]
+        
+                for i, val in enumerate(dataset[1:]):
+        
+                    delta = abs(val - delta)
+                    if delta < tol:
+                        print "Based on converging " + y_name + " to " + str(tol) + " " + y_unit + ", minimum " + x_name + " suggested is " + str(data[x]['range'][i]) + " " + x_unit
+                        break
+        
+                    delta = val
+        
+                    if i == len(dataset[1:])-1:
+                        print "Unable to converge " + x_name + " with " + y_name + " within given range.  Try increasing maximum " + x_name + " for your search"
+        
+    
 # Parse command line arguments
 
 def parse_cmd_args():
@@ -635,17 +731,21 @@ def job_run(foldname, jobname, running_jobs=None):
     if(stdout_file is not None):
         stdout_file.close()
 
+def multijob_wait(running_jobs=None, wait_all=False):
+
+    global int_par_vals
+
     if (running_jobs is not None):
         # PARALLEL operation case
-        if int_par_vals["maxjobs"] > 0:
-                    while len(running_jobs) >= int_par_vals["maxjobs"]:
-                        for job_ind in range(len(running_jobs)-1, -1, -1):
-                            try:
-                                if jobfinish_check(running_jobs[job_ind][0], running_jobs[job_ind][1]):
-                                    del running_jobs[job_ind]
-                            except JobError as JE:
-                                del running_jobs[job_ind]
-                                print "WARNING - " + str(JE)
+        if int_par_vals["maxjobs"] > 0 or wait_all:
+            while (not wait_all and len(running_jobs) >= int_par_vals["maxjobs"]) or (wait_all and (len(running_jobs) > 0)):
+                for job_ind in range(len(running_jobs)-1, -1, -1):
+                    try:
+                        if jobfinish_check(running_jobs[job_ind][0], running_jobs[job_ind][1]):
+                            del running_jobs[job_ind]
+                    except JobError as JE:
+                        del running_jobs[job_ind]
+                        print "WARNING - " + str(JE)
     else:
         # SERIAL operation case
         try:
@@ -916,11 +1016,11 @@ if (str_par_vals['ctsk'] in ("input", "inputrun", "all")):
     conv_tab_file.write("cutoff:\t")
     for cut in cutrange:
         conv_tab_file.write(str(cut) + " eV\t")
-        allrange.append({'cut': cut, 'kpn': kpnrange[0]})
+        allrange.append({'cut': cut, 'kpn': kpnrange[0], 'scan': 'cut'})
     conv_tab_file.write("\nkpoint_n:\t" + kgrid(kpnrange[0]) + "\t|\t")
     for kpn in kpnrange[1:]:
         conv_tab_file.write(kgrid(kpn) + "\t|\t")
-        allrange.append({'cut': cutrange[0], 'kpn': kpn})
+        allrange.append({'cut': cutrange[0], 'kpn': kpn, 'scan': 'kpn'})
     conv_tab_file.close()
 
     foldname = None
@@ -980,7 +1080,7 @@ if (str_par_vals['ctsk'] in ("input", "inputrun", "all")):
 
 
 # PHASE 2 - EXECUTION
-# Run through the files (or create them as we go if the task is serial) and obtain the results
+# Run through the files and obtain the results
 
 if (str_par_vals["ctsk"] in ("all", "inputrun")):
 
@@ -990,57 +1090,37 @@ if (str_par_vals["ctsk"] in ("all", "inputrun")):
 
         running_jobs = []
 
-        for pars in allrange:
-
-            cut = pars['cut']
-            kpn = pars['kpn']
-
-            foldname = jname(seedname, cut, kpn)
-            print "Running job " + jobname
-
-            job_run(foldname, foldname, running_jobs)
-
-        # If we're running an ALL job, wait for everyone to finish
-
-        if str_par_vals["ctsk"] == "all":
-
-            print "Waiting for all jobs to finish \
-            WARNING: The program can be terminated with Ctrl+C, but that could terminate also the running jobs"
-
-            for pars in allrange:
-                cut = pars['cut']
-                kpn = pars['kpn']
-
-                foldname = jname(seedname, cut, kpn)
-                try:
-                    jobfinish_wait(foldname, foldname)
-                except JobError as JE:
-                    print "WARNING - " + str(JE)
-
-            print "\n -- All jobs finished. Proceeding to analyze output --"
-
     elif str_par_vals["rmode"] == "serial":
 
         print "Running serial convergence jobs"
 
+        running_jobs = None
+
         foldname = seedname + "_conv"
-
-        for pars in allrange:
-
-            cut = pars['cut']
-            kpn = pars['kpn']
-
-            jobname = jname(seedname, cut, kpn)
-
-            print "Running job " + jobname
-
-            job_run(foldname, jobname)
-
-        if str_par_vals["ctsk"] == "all":
-            print "\n -- All jobs finished. Proceeding to analyze output --\n"
 
     else:
         sys.exit("ERROR - Invalid value for the running_mode parameter")
+
+    for i, pars in enumerate(allrange):
+
+        cut = pars['cut']
+        kpn = pars['kpn']
+
+        jobname = jname(seedname, cut, kpn)
+        if str_par_vals["rmode"] == "parallel":
+            foldname = jobname
+
+        print "Running job " + jobname
+
+        job_run(foldname, jobname, running_jobs)
+        # Wait for everyone to finish
+        multijob_wait(running_jobs, wait_all=(i==(len(allrange)-1)))
+
+    if (str_par_vals["ctsk"] == "all"):
+        print "\n -- All jobs finished. Proceeding to analyze output --\n"
+
+# PHASE 3 - OUTPUT PARSING
+# Here is where we parse the .CASTEP files and draw our conclusions
 
 if (str_par_vals["ctsk"] in ("all", "output")):
 
@@ -1049,32 +1129,44 @@ if (str_par_vals["ctsk"] in ("all", "output")):
     if (cutrange is None or kpnrange is None):
         cut_n = int(math.ceil(float_par_vals["cutmax"]-float_par_vals["cutmin"])/float_par_vals["cutstep"])+1
         cutrange = [float_par_vals["cutmin"] + i * float_par_vals["cutstep"] for i in range(0, cut_n)]
-
+    
         kpn_n = int(math.ceil(int_par_vals["kpnmax"]-int_par_vals["kpnmin"])/int_par_vals["kpnstep"])+1
         kpnrange = [tuple([int((int_par_vals["kpnmin"] + i * int_par_vals["kpnstep"]) * e) for e in kpn_base]) for i in range(0, kpn_n)]
-
+    
         if os.path.isfile(seedname + ".conv_tab"):
             cutrange, kpnrange = parse_conv_tab_file(open(seedname + ".conv_tab", 'r'))
-
+    
     calc_str = bool_par_vals["cnvstr"]
-
+    
+    if (allrange is None):
+        allrange = []
+        for cut in cutrange:
+            allrange.append({'cut': cut, 'kpn': kpnrange[0], 'scan': 'cut'})
+        for kpn in kpnrange[1:]:
+            allrange.append({'cut': cutrange[0], 'kpn': kpn, 'scan': 'kpn'})
+    
     cutnrg = []
     cutfor = []
     cutstr = []
     kpnnrg = []
     kpnfor = []
     kpnstr = []
-
+    
     # Try opening the various .castep files and collect energy and forces
-
-    for i, cut in enumerate(cutrange):
-
-        jobname = seedname + "_cut_" + str(cut) + "_kpn_" + str(min(kpnrange[0]))
-
+    
+    for pars in allrange:
+        
+        cut = pars['cut']
+        kpn = pars['kpn']
+        
+        jobname = jname(seedname, cut, kpn)
+        
         if (str_par_vals["rmode"] == "serial"):
             foldname = seedname + "_conv"
-        else:
+        elif (str_par_vals["rmode"] == "parallel"):
             foldname = jobname
+        else:
+            sys.exit("ERROR - Invalid value for the running_mode parameter")
 
         filepath = os.path.join(foldname, jobname + '.castep')
 
@@ -1090,35 +1182,12 @@ if (str_par_vals["ctsk"] in ("all", "output")):
         cut_check = None
         kpn_check = None
 
-        start_l = rindex_cont(castepfile, __CASTEP_HEADER__)
+        try:
+            atom_n, i_nrg, i_for, i_str, cut_check, kpn_check = parse_castep_file(castepfile, filepath)
+        except CastepError as CE:
+            sys.exit("ERROR - " + str(CE))
 
-        for j, l in enumerate(castepfile[start_l:]):
-
-            try:
-                if __CASTEP_ATOMN__ in l and atom_n is None:
-                    atom_n = int(l.split()[7])
-                elif __CASTEP_CUTOFF__ in l:
-                    cut_check = float(l.split()[6])
-                elif __CASTEP_KPOINTS__ in l:
-                    kpn_check = tuple([int(x) for x in l.split()[7:]])
-                elif __CASTEP_ENERGY__ in l and not has_fix_occ:
-                    i_nrg = float(l.split()[4])
-                elif __CASTEP_ENERGY_FIX__ in l and has_fix_occ:
-                    i_nrg = float(l.split()[3])
-                elif __CASTEP_FORCES__ in l or __CASTEP_FORCES_ALT__ in l:
-                    i_for = parse_forces(castepfile[start_l+j:])
-                elif calc_str and (__CASTEP_STRESSES__ in l or __CASTEP_STRESSES_ALT__ in l):
-                    i_str = parse_stresses(castepfile[start_l+j:])
-            except ValueError:
-                sys.exit("ERROR - Corrupted " + filepath + " file detected")
-            except CastepError as CE:
-                sys.exit("ERROR - " + str(CE) + " in file " + filepath)
-
-
-            if atom_n is not None and i_nrg is not None and i_for is not None and cut_check is not None and kpn_check is not None and ((calc_str and i_str is not None) or not calc_str):
-                break
-
-        if cut_check is None or kpn_check is None or cut_check != cut or kpn_check != kpnrange[0]:
+        if cut_check is None or kpn_check is None or cut_check != cut or kpn_check != kpn:
             sys.exit("ERROR - Simulation parameters in " + filepath + " do not correspond to expected values")
 
         if i_nrg is None or i_for is None:
@@ -1130,77 +1199,21 @@ if (str_par_vals["ctsk"] in ("all", "output")):
         if atom_n is None:
             sys.exit("ERROR - Corrupted " + filepath + " file")
 
-        cutnrg.append(i_nrg)
-        cutfor.append(i_for)
-        if calc_str:
-            cutstr.append(i_str)
-
-    kpnnrg.append(cutnrg[0])
-    kpnfor.append(cutfor[0])
-
-    if calc_str:
-        kpnstr.append(cutstr[0])
-
-    for i, kpn in enumerate(kpnrange[1:]):
-
-        jobname = seedname + "_cut_" + str(cutrange[0]) + "_kpn_" + str(min(kpn))
-
-        if (str_par_vals["rmode"] == "serial"):
-            foldname = seedname + "_conv"
-        else:
-            foldname = jobname
-
-        filepath = os.path.join(foldname, jobname + '.castep')
-
-        if not os.path.isfile(filepath):
-            sys.exit("ERROR - File " + filepath + " not found. Please check the .conv file and that all calculations have actually finished")
-
-        castepfile = open(filepath, 'r').readlines()
-
-        i_nrg = None
-        i_for = None
-        i_str = None
-        cut_check = None
-        kpn_check = None
-
-        start_l = rindex_cont(castepfile, __CASTEP_HEADER__)
-
-        for j, l in enumerate(castepfile[start_l:]):
-
-            try:
-                if __CASTEP_CUTOFF__ in l:
-                    cut_check = float(l.split()[6])
-                elif __CASTEP_KPOINTS__ in l:
-                    kpn_check = tuple([int(x) for x in l.split()[7:]])
-                elif __CASTEP_ENERGY__ in l and not has_fix_occ:
-                    i_nrg = float(l.split()[4])
-                elif __CASTEP_ENERGY_FIX__ in l and has_fix_occ:
-                    i_nrg = float(l.split()[3])
-                elif __CASTEP_FORCES__ in l or __CASTEP_FORCES_ALT__ in l:
-                    i_for = parse_forces(castepfile[start_l+j:])
-                elif calc_str and (__CASTEP_STRESSES__ in l or __CASTEP_STRESSES_ALT__ in l):
-                    i_str = parse_stresses(castepfile[start_l+j:])
-            except ValueError:
-                sys.exit("ERROR - Corrupted " + filepath + " file detected")
-            except CastepError as CE:
-                sys.exit("ERROR - " + str(CE) + " in file " + filepath)
-
-            if i_nrg is not None and i_for is not None and cut_check is not None and kpn_check is not None and ((calc_str and i_str is not None) or not calc_str):
-                break
-
-        if cut_check is None or kpn_check is None or cut_check != cutrange[0] or kpn_check != kpn:
-            sys.exit("ERROR - Simulation parameters in " + filepath + " do not correspond to expected values")
-
-        if i_nrg is None or i_for is None:
-            sys.exit("ERROR - Incomplete simulation results in " + filepath + " (missing energy or forces)")
-
-        if calc_str and i_str is None:
-            sys.exit("ERROR - Incomplete simulation results in " + filepath + " (missing stresses)")
-
-        kpnnrg.append(i_nrg)
-        kpnfor.append(i_for)
-        if calc_str:
-            kpnstr.append(i_str)
+        if (pars['scan'] == 'cut'):
+            cutnrg.append(i_nrg)
+            cutfor.append(i_for)
+            if calc_str:
+                cutstr.append(i_str)
+        elif (pars['scan'] == 'kpn'):
+            if (len(kpnnrg) == 0):
+                kpnnrg.append(cutnrg[0])
+                kpnfor.append(cutfor[0])
+                if calc_str:
+                    kpnstr.append(cutstr[0])
+            kpnnrg.append(i_nrg)
+            kpnfor.append(i_for)
+            if calc_str:
+                kpnstr.append(i_str)
 
     # Save the results in data files
 
@@ -1220,162 +1233,28 @@ if (str_par_vals["ctsk"] in ("all", "output")):
 
     # Make an estimate of the best values
 
-    print "Convergence results:"
+    conv_data = {}
+    conv_data['cut'] = {'range': cutrange,
+        'step': float_par_vals['cutstep'],
+        'nrg': [x/atom_n for x in cutnrg],
+        'for': cutfor,}
+    conv_data['kpn'] = {'range': [sum(k) for k in kpnrange],
+        'step': int_par_vals['kpnstep']*3,
+        'nrg': [x/atom_n for x in kpnnrg],
+        'for': kpnfor}
 
-    if len(cutnrg) < 2:
-        print "Impossible to give a convergence estimate with a single cutoff point"
-    elif float_par_vals["nrgtol"] <= 0.0:
-        print "Impossible to give a convergence estimate with a null or negative value for final_energy_delta"
-    else:
+    if bool_par_vals['cnvstr']:
+        conv_data['cut']['str'] = cutstr
+        conv_data['kpn']['str'] = kpnstr
 
-        delta_nrg = cutnrg[0]
-
-        for i, nrg in enumerate(cutnrg[1:]):
-
-            delta_nrg = abs(nrg - delta_nrg)
-            if delta_nrg/atom_n < float_par_vals["nrgtol"]:
-                print "Based on converging total energy to " + str(float_par_vals["nrgtol"]) + " eV per atom, minimum cutoff suggested is " + str(cutrange[i]) + " eV"
-                break
-
-            delta_nrg = nrg
-
-            if i == len(cutnrg[1:])-1:
-                print "Unable to converge cutoff with energy within given range.  Try increasing cutoff_max in " + seedname + ".conv"
-
-    if len(cutfor) < 2:
-        print "Impossible to give a convergence estimate with a single force point"
-    elif float_par_vals["fortol"] <= 0.0:
-        print "Impossible to give a convergence estimate with a null or negative value for forces_delta"
-    else:
-
-        delta_for = cutfor[0]
-
-        if delta_for < float_par_vals["fortol"]:
-            print "WARNING - Maximum force is lower than " + str(float_par_vals["fortol"]) + " eV/Ang. A different atom displacement might be necessary to get meaningful results"
-
-        for i, force in enumerate(cutfor[1:]):
-
-            delta_for = abs(force - delta_for)
-            if delta_for < float_par_vals["fortol"]:
-                print "Based on converging maximum force to " + str(float_par_vals["fortol"]) + " eV/Ang, minimum cutoff suggested is " + str(cutrange[i]) + " eV"
-                break
-
-            delta_for = force
-
-            if i == len(cutfor[1:])-1:
-                print "Unable to converge cutoff with forces within given range.  Try increasing cutoff_max in " + seedname + ".conv"
-
-    if bool_par_vals["cnvstr"]:
-        if len(cutstr) < 2:
-            print "Impossible to give a convergence estimate with a single stresses point"
-        elif float_par_vals["strtol"] <= 0.0:
-            print "Impossible to give a convergence estimate with a null or negative value for stresses_delta"
-        else:
-
-            delta_str = cutstr[0]
-
-            if delta_str < float_par_vals["strtol"]:
-                print "WARNING - Maximum stress is lower than " + str(float_par_vals["strtol"]) + " GPa. A different atom displacement might be necessary to get meaningful results"
-
-            for i, stress in enumerate(cutstr[1:]):
-
-                delta_str = abs(stress - delta_str)
-                if delta_str < float_par_vals["strtol"]:
-                    print "Based on converging maximum stress to " + str(float_par_vals["fortol"]) + " GPa, minimum cutoff suggested is " + str(cutrange[i]) + " eV"
-                    break
-
-                delta_str = stress
-
-                if i == len(cutstr[1:])-1:
-                    print "Unable to converge cutoff with total stresses within given range.  Try increasing cutoff_max in " + seedname + ".conv"
-
-    if len(kpnnrg) < 2:
-        print "Impossible to give a convergence estimate with a single cutoff point"
-    elif float_par_vals["nrgtol"] <= 0.0:
-        print "Impossible to give a convergence estimate with a null or negative value for final_energy_delta"
-    else:
-
-        delta_nrg = kpnnrg[0]
-
-        for i, nrg in enumerate(kpnnrg[1:]):
-
-            delta_nrg = abs(nrg - delta_nrg)
-            if delta_nrg/atom_n < float_par_vals["nrgtol"]:
-                print "Based on converging total energy to " + str(float_par_vals["nrgtol"]) + " eV per atom, minimum kpoint grid suggested is " + kgrid(kpnrange[i])
-                break
-
-            delta_nrg = nrg
-
-            if i == len(kpnnrg[1:])-1:
-                print "Unable to converge k-point grid with energy within given range.  Try increasing kpoint_n_max in " + seedname + ".conv"
-
-    if len(kpnfor) < 2:
-        print "Impossible to give a convergence estimate with a single force point"
-    elif float_par_vals["fortol"] <= 0.0:
-        print "Impossible to give a convergence estimate with a null or negative value for forces_delta"
-    else:
-
-        delta_for = kpnfor[0]
-
-        if delta_for < float_par_vals["fortol"]:
-            print "WARNING - Maximum force is lower than " + str(float_par_vals["fortol"]) + " eV/Ang. A different atom displacement might be necessary to get meaningful results"
-
-        for i, force in enumerate(kpnfor[1:]):
-
-            delta_for = abs(force - delta_for)
-            if delta_for < float_par_vals["fortol"]:
-                print "Based on converging maximum force to " + str(float_par_vals["fortol"]) + " eV/Ang, minimum kpoint grid suggested is " + kgrid(kpnrange[i])
-                break
-
-            delta_for = force
-
-            if i == len(kpnfor[1:])-1:
-                print "Unable to converge k-point grid with forces within given range.  Try increasing kpoint_n_max in " + seedname + ".conv"
-
-    if bool_par_vals["cnvstr"]:
-        if len(kpnstr) < 2:
-            print "Impossible to give a convergence estimate with a single force point"
-        elif float_par_vals["strtol"] <= 0.0:
-            print "Impossible to give a convergence estimate with a null or negative value for stresses_delta"
-        else:
-
-            delta_str = kpnstr[0]
-
-            if delta_str < float_par_vals["strtol"]:
-                print "WARNING - Maximum stress is lower than " + str(float_par_vals["strtol"]) + " GPa. A different atom displacement might be necessary to get meaningful results"
-
-            for i, stress in enumerate(kpnstr[1:]):
-
-                delta_str = abs(stress - delta_str)
-                if delta_str < float_par_vals["strtol"]:
-                    print "Based on converging maximum stress to " + str(float_par_vals["strtol"]) + " GPa, minimum kpoint grid suggested is " + kgrid(kpnrange[i])
-                    break
-
-                delta_str = stress
-
-                if i == len(kpnstr[1:])-1:
-                    print "Unable to converge k-point grid with stresses within given range.  Try increasing kpoint_n_max in " + seedname + ".conv"
+    conv_estimates(conv_data, calc_str)
 
     # Finally, let's do the plotting
 
     if str_par_vals["outp"] == "gnuplot":
 
-        gp_graph(seedname, bool_par_vals['cnvstr'])
+        gp_graph(seedname, calc_str)
 
     elif str_par_vals["outp"] in ("xmgrace", "grace"):
 
-        agr_data = {}
-        agr_data['cut'] = {'range': cutrange,
-            'step': float_par_vals['cutstep'],
-            'nrg': cutnrg,
-            'for': cutfor,}
-        agr_data['kpn'] = {'range': [sum(k) for k in kpnrange],
-            'step': int_par_vals['kpnstep']*3,
-            'nrg': kpnnrg,
-            'for': kpnfor}
-
-        if bool_par_vals['cnvstr']:
-            agr_data['cut']['str'] = cutstr
-            agr_data['kpn']['str'] = kpnstr
-
-        agr_graph(seedname, agr_data)
+        agr_graph(seedname, conv_data, calc_str)

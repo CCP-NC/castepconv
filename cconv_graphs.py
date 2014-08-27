@@ -11,7 +11,7 @@ def gp_graph(seedname, cnvstr=False):
             out_file = open(seedname + '_' + x  + ('_str' if y == 'str' else '') + '_conv.gp', 'w')
 
             out_file.write('set xlabel "' + _x_types[x] + '"\n')
-            out_file.write('set ylabel "Final energy (eV)"\n')
+            out_file.write('set ylabel "Final energy (eV/atom)"\n')
             out_file.write('set y2label "' + _y_types[y] + '"\n')
             out_file.write('set ytics nomirror\n')
             out_file.write('set y2tics\n')
@@ -22,13 +22,13 @@ def gp_graph(seedname, cnvstr=False):
 
             out_file.close()
 
-def agr_graph(seedname, data):
+def agr_graph(seedname, data, cnvstr=False):
 
     # data needs to be a dict formatted as: {'cut':  {'range': [...], 'nrg': [...], 'for': [...] etc.}}
 
     for x in _x_types:
         for y in _y_types:
-            if y == 'str' and not 'str' in data[x]:
+            if y == 'str' and not cnvstr:
                 continue
 
             # Cutoff vs energy and forces
@@ -55,7 +55,7 @@ def agr_graph(seedname, data):
             out_file.write('@    xaxis label "' + _x_types[x] + '"\n')
             out_file.write('@    xaxis tick major ' + str(data[x]['step']) + '\n')
             out_file.write('@    xaxis offset 0.0, 1.0\n')
-            out_file.write('@    yaxis label "Final energy (eV)"\n')
+            out_file.write('@    yaxis label "Final energy (eV/atom)"\n')
             out_file.write('@    yaxis tick major ' + str((y1rng[1]-y1rng[0])/8.0) + '\n')
             out_file.write('@    yaxis offset 0.0, 1.0\n')
             out_file.write('@    s0 hidden false\n@    s0 on\n')

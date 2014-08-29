@@ -11,7 +11,7 @@ import subprocess as sp
 
 from cconv_graphs import gp_graph, agr_graph
 
-__vers_number__ = "0.9.3"
+__vers_number__ = "0.9.5"
 
 # Try importing argparse - if the Python version is too old, use optparse
 
@@ -941,6 +941,8 @@ def fgmax_validate():
             raise ConvError("fine_gmax_max must be greater than " + str(__gscale__**2) + "*cutoff_max for fine_gmax_mode = MAX")
         elif float_par_vals['fgmmax'] <= float_par_vals['fgmmin']:
             raise ConvError("Invalid fine Gmax range defined in .conv file")
+    elif fgmmode == 'none':
+        str_par_vals['fgmmode'] = None
     else:
         raise ConvError("Invalid value for fine_gmax_mode parameter in .conv file")
 
@@ -1425,10 +1427,10 @@ if (str_par_vals["ctsk"] in ("all", "output")):
 
     if (conv_fgm):
         fgmfile = open(seedname + "_fgm_conv.dat", 'w')
-        fgmfile.write("Fine Gmax (eV)\tEnergy (eV)\tForces (eV/A)" + ("\tTotal stresses (GPa)" if calc_str else "") + "\n")
+        fgmfile.write("Fine Gmax (eV)\tEnergy (eV)\t\tMax force (eV/A)" + ("\tTotal stress (GPa)" if calc_str else "") + "\tFine Gmax (1/A)\n")
     
         for i in range(0, len(fgmrange)):
-            fgmfile.write(str(fgmrange[i]) + '\t\t' + str(fgmnrg[i]) + '\t\t' + str(fgmfor[i]) + ('\t\t' + str(fgmstr[i]) if calc_str else '') + '\n')
+            fgmfile.write(str(fgmrange[i]) + '\t\t' + str(fgmnrg[i]) + '\t\t' + str(fgmfor[i]) + ('\t\t' + str(fgmstr[i]) if calc_str else '') + '\t\t' + str(round_digits(cut_to_k(fgmrange[i]), 4)) + '\n')
         
         fgmfile.close()
     

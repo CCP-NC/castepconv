@@ -47,7 +47,7 @@ def agr_graph(seedname, data, cnvstr=False):
 
             out_file.write('@version 50123\n')
             out_file.write('@title "' + seedname + ' - Energy and ' + {'for': 'forces', 'str': 'stresses'}[y] + 'vs ' +
-            {'cut': 'cutoff', 'kpn': 'k-points'}[x] + '"\n')
+            {'cut': 'cutoff', 'kpn': 'k-points', 'fgm': 'fine Gmax'}[x] + '"\n')
 
             out_file.write('@g0 on\n@g0 hidden false\n@with g0\n')
             out_file.write('@world ' + str(x1rng[0]) + ',' + str(y1rng[0]) + ',' + str(x1rng[1]) + ',' + str(y1rng[1]) + '\n')

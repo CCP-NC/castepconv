@@ -180,7 +180,7 @@ __CASTEP_STRESSES_END__ = "*                                               *"
 
 # Just a useful snippet to return a kpoint grid from a 3-ple
 
-def kgrid(t): return str(t[0]) + '\t' + str(t[1]) + '\t' + str(t[2])
+def kgrid(t, sep=' '): return str(t[0]) + sep + str(t[1]) + sep + str(t[2])
 
 # Another convenient snippet - this time to build a 'jobname'
 
@@ -606,17 +606,21 @@ def parse_castep_file(cfile, filepath):
 
 # Find reasonable estimates for convergence values
 
-def conv_estimates(data, cnvstr=False):
+def conv_estimates(seedname, data, cnvstr=False):
 
     global float_par_vals
 
     ordered_x = ['cut', 'kpn', 'fgm']    # Just for the sake of printing them in the right order
+    ordered_y = ['nrg', 'for', 'str']    # Same as above
     data_x = {'cut': ['cutoff', 'eV'], 'kpn': ['k-point grid', 'points'], 'fgm': ['fine Gmax', 'eV']}
     data_y = {'nrg': ['total energy', 'eV per atom'], 'for': ['maximum force', 'eV/Ang'], 'str': ['maximum stress', 'GPa']}
 
     opt_vals = {}
-
-    print "Convergence results:"
+    
+    out_string = ""
+    
+    
+    out_string += "Convergence results:\n"
 
     for x in ordered_x:
         x_name = data_x[x][0]
@@ -624,15 +628,15 @@ def conv_estimates(data, cnvstr=False):
 
         opt_vals[x] = {}
         
-        for y in data[x]:
+        for y in ordered_y:
 
-            if y in ('range', 'step'):
-                continue
-
-            if y == 'str' and not cnvstr:
+            if y in ('range', 'rangestr', 'step'):
                 continue
 
             opt_vals[x][y] = None
+
+            if y == 'str' and not cnvstr:
+                continue
 
             dataset = data[x][y]
             y_name = data_y[y][0]
@@ -640,9 +644,9 @@ def conv_estimates(data, cnvstr=False):
             tol = float_par_vals[y+"tol"]
 
             if len(dataset) < 2:
-                print "Impossible to give a convergence estimate with a single cutoff point"
+                out_string += "Impossible to give a convergence estimate with a single cutoff point\n"
             elif tol <= 0.0:
-                print "Impossible to give a convergence estimate with a null or negative value for " + y_name + " tolerance"
+                out_string +=  "Impossible to give a convergence estimate with a null or negative value for " + y_name + " tolerance\n"
             else:
 
                 delta = dataset[0]
@@ -651,16 +655,50 @@ def conv_estimates(data, cnvstr=False):
 
                     delta = abs(val - delta)
                     if delta < tol:
-                        print "Based on converging " + y_name + " to " + str(tol) + " " + y_unit + ", minimum " + x_name + " suggested is " + str(data[x]['range'][i]) + " " + x_unit
+                        out_string += "Based on converging " + y_name + " to " + str(tol) + " " + y_unit + ", minimum " + x_name + " suggested is " + str(data[x]['rangestr'][i]) + " " + x_unit
                         if (x == 'fgm'):
-                            print "( corresponding to a value of " + str(round_digits(cut_to_k(data[x]['range'][i]), 4)) + " 1/Ang)"
+                            out_string +=  " (corresponding to a value of " + str(round_digits(cut_to_k(data[x]['range'][i]), 4)) + " 1/Ang)\n"
+                        else:
+                            out_string += "\n"
+                        
                         opt_vals[x][y] = data[x]['range'][i]
                         break
 
                     delta = val
 
                     if i == len(dataset[1:])-1:
-                        print "Unable to converge " + x_name + " with " + y_name + " within given range.  Try increasing maximum " + x_name + " for your search"
+                        out_string +=  "Unable to converge " + x_name + " with " + y_name + " within given range.  Try increasing maximum " + x_name + " for your search\n"
+
+    out_string += "\n"
+
+    # Generate a global estimate
+
+    max_vals = {}
+    max_str  = {}
+
+    for x in ordered_x:
+
+        max_vals[x] = -1
+        max_str[x] = ''
+
+        for y in opt_vals[x]:
+
+            if opt_vals[x][y] > max_vals[x]:
+                max_vals[x] = opt_vals[x][y]
+                max_str[x] = data[x]['rangestr'][data[x]['range'].index(opt_vals[x][y])]
+            elif opt_vals[x][y] is None:
+                max_str[x] = "N/A"
+                break
+        
+        out_string += "Overall suggested " + data_x[x][0] + " is " + max_str[x] + " " + data_x[x][1] + "\n"
+    
+    sys.stdout.write(out_string)
+
+    # Also save as report file
+
+    optfile = open(seedname + "_report.txt", 'w')
+    optfile.write(out_string)
+    optfile.close()
 
     return opt_vals
 
@@ -940,7 +978,7 @@ if (sys.version_info[0] < 2 or (sys.version_info[0] == 2 and sys.version_info[1]
 
 print "CASTEPconv v. " + __vers_number__ + "\n"
 print "by Simone Sturniolo"
-print "Copyright 2014 Science and Technology Facilities Council"
+print "Copyright 2014 Science and Technology Facilities Council\n"
 
 seedname, cmdline_task = parse_cmd_args()
 
@@ -1020,10 +1058,10 @@ if (str_par_vals['ctsk'] in ("clear")):
         to_del_fold.add(seedname + "_pspot")
 
     # Create a list of files to delete
-    to_del_suffixes = [".conv_tab",
-        "_cut_conv.dat", "_kpn_conv.dat",
-        "_cut_conv.gp",  "_kpn_conv.gp",  "_cut_str_conv.gp",  "_kpn_str_conv.gp",
-        "_cut_conv.agr", "_kpn_conv.agr", "_cut_str_conv.agr", "_kpn_str_conv.agr"]   # A list of all possible files to delete
+    to_del_suffixes = [".conv_tab", "_report.txt",
+        "_cut_conv.dat", "_kpn_conv.dat", "_fgm_conv.dat",
+        "_cut_conv.gp",  "_kpn_conv.gp", "_fgm_conv.gp",   "_cut_str_conv.gp",  "_kpn_str_conv.gp",  "_fgm_str_conv.gp",
+        "_cut_conv.agr", "_kpn_conv.agr", "_fgm_conv.agr", "_cut_str_conv.agr", "_kpn_str_conv.agr", "_fgm_str_conv.agr"]   # A list of all possible files to delete
 
     to_del_files = []
 
@@ -1398,14 +1436,17 @@ if (str_par_vals["ctsk"] in ("all", "output")):
 
     conv_data = {}
     conv_data['cut'] = {'range': cutrange,
+        'rangestr': [str(c) for c in cutrange],
         'step': float_par_vals['cutstep'],
         'nrg': [x/atom_n for x in cutnrg],
         'for': cutfor}
-    conv_data['kpn'] = {'range': [sum(k) for k in kpnrange],
+    conv_data['kpn'] = {'range': [k[0]*k[1]*k[2] for k in kpnrange],
+        'rangestr': [kgrid(k, 'x') for k in kpnrange],
         'step': int_par_vals['kpnstep']*3,
         'nrg': [x/atom_n for x in kpnnrg],
         'for': kpnfor}
     conv_data['fgm'] = {'range': fgmrange,
+        'rangestr': [str(f) for f in fgmrange],
         'step': float_par_vals['fgmstep'],
         'nrg': [x/atom_n for x in fgmnrg],
         'for': fgmfor}
@@ -1415,14 +1456,12 @@ if (str_par_vals["ctsk"] in ("all", "output")):
         conv_data['kpn']['str'] = kpnstr
         conv_data['fgm']['str'] = fgmstr
 
-    opt_estimates = conv_estimates(conv_data, calc_str)
-
+    opt_estimates = conv_estimates(seedname, conv_data, calc_str)
+    
     # Finally, let's do the plotting
 
     if str_par_vals["outp"] == "gnuplot":
-
         gp_graph(seedname, calc_str)
 
     elif str_par_vals["outp"] in ("xmgrace", "grace"):
-
         agr_graph(seedname, conv_data, calc_str)

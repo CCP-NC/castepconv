@@ -67,18 +67,18 @@ length_units = {'ang':1.0, 'm':1.0e10, 'cm':1.0e8, 'nm':10.0, 'bohr':0.529, 'a0'
 str_par_names = {
 "convergence_task"      : "ctsk",
 "running_mode"          : "rmode",
-"output_type"           :  "outp",
+"output_type"           : "outp",
 "running_command"       : "rcmd",
 "submission_script"     : "subs",
-"fine_gmax_mode"   : "fgmmode",
+"fine_gmax_mode"        : "fgmmode",
 }
 
 str_par_vals = {
-"ctsk"   : "input",                         # Can be INPUT, INPUTRUN, OUTPUT or ALL
-"rmode"  : "serial",                        # Can be PARALLEL or SERIAL
-"outp"   : "gnuplot",                       # Can be GNUPLOT or XMGRACE
-"rcmd"   : "castep <seedname> -dryrun",
-"subs"   : None,
+"ctsk"    : "input",                         # Can be INPUT, INPUTRUN, OUTPUT or ALL
+"rmode"   : "serial",                        # Can be PARALLEL or SERIAL
+"outp"    : "gnuplot",                       # Can be GNUPLOT or XMGRACE
+"rcmd"    : "castep <seedname> -dryrun",
+"subs"    : None,
 "fgmmode" : None,                            # Can be MIN or MAX
 }
 
@@ -610,14 +610,20 @@ def conv_estimates(data, cnvstr=False):
 
     global float_par_vals
 
-    data_x = {'cut': ['cutoff', 'eV'], 'kpn': ['k-point grid', 'points']}
+    ordered_x = ['cut', 'kpn', 'fgm']    # Just for the sake of printing them in the right order
+    data_x = {'cut': ['cutoff', 'eV'], 'kpn': ['k-point grid', 'points'], 'fgm': ['fine Gmax', 'eV']}
     data_y = {'nrg': ['total energy', 'eV per atom'], 'for': ['maximum force', 'eV/Ang'], 'str': ['maximum stress', 'GPa']}
+
+    opt_vals = {}
 
     print "Convergence results:"
 
-    for x in data:
+    for x in ordered_x:
         x_name = data_x[x][0]
         x_unit = data_x[x][1]
+
+        opt_vals[x] = {}
+        
         for y in data[x]:
 
             if y in ('range', 'step'):
@@ -625,6 +631,8 @@ def conv_estimates(data, cnvstr=False):
 
             if y == 'str' and not cnvstr:
                 continue
+
+            opt_vals[x][y] = None
 
             dataset = data[x][y]
             y_name = data_y[y][0]
@@ -644,12 +652,17 @@ def conv_estimates(data, cnvstr=False):
                     delta = abs(val - delta)
                     if delta < tol:
                         print "Based on converging " + y_name + " to " + str(tol) + " " + y_unit + ", minimum " + x_name + " suggested is " + str(data[x]['range'][i]) + " " + x_unit
+                        if (x == 'fgm'):
+                            print "( corresponding to a value of " + str(round_digits(cut_to_k(data[x]['range'][i]), 4)) + " 1/Ang)"
+                        opt_vals[x][y] = data[x]['range'][i]
                         break
 
                     delta = val
 
                     if i == len(dataset[1:])-1:
                         print "Unable to converge " + x_name + " with " + y_name + " within given range.  Try increasing maximum " + x_name + " for your search"
+
+    return opt_vals
 
 
 # Parse command line arguments
@@ -724,6 +737,8 @@ def create_conv_folder(foldname, jobname, cut, kpn, fgm, prev_jobname=None):
     icell.write("\nkpoint_mp_grid " + kgrid(kpn) + "\n")
     icell.close()
 
+    # Write param file
+    
     iparam.write("task:\tSinglePoint\n")
     iparam.write("cut_off_energy:\t" + str(cut) + " eV\n")
     for l in stripped_param:
@@ -868,24 +883,24 @@ def fgmax_validate():
         pass
     elif fgmmode == 'min':
         if float_par_vals['fgmmin'] is None:
-            float_par_vals['fgmmin'] = __gscale__*float_par_vals['cutmin']
-        elif float_par_vals['fgmmin'] < float_par_vals['cutmin']:
-            raise ConvError("fine_gmax_min must be greater or equal than " + str(__gscale__) + "*cutoff_min for fine_gmax_mode = MIN")
+            float_par_vals['fgmmin'] = __gscale__**2*float_par_vals['cutmin']
+        elif float_par_vals['fgmmin'] < __gscale__**2*float_par_vals['cutmin']:
+            raise ConvError("fine_gmax_min must be greater or equal than " + str(__gscale__**2) + "*cutoff_min for fine_gmax_mode = MIN")
         if float_par_vals['fgmmax'] is None:
             float_par_vals['fgmmax'] = float_par_vals['fgmmin']+3.0*float_par_vals['fgmstep']
-        elif float_par_vals['fgmmax'] <= float_par_vals['cutmin']:
-            raise ConvError("fine_gmax_max must be greater than " + str(__gscale__) + "*cutoff_min for fine_gmax_mode = MIN")
+        elif float_par_vals['fgmmax'] <= __gscale__**2*float_par_vals['cutmin']:
+            raise ConvError("fine_gmax_max must be greater than " + str(__gscale__**2) + "*cutoff_min for fine_gmax_mode = MIN")
         elif float_par_vals['fgmmax'] <= float_par_vals['fgmmin']:
             raise ConvError("Invalid fine Gmax range defined in .conv file")
     elif fgmmode == 'max':
         if float_par_vals['fgmmin'] is None:
-            float_par_vals['fgmmin'] = __gscale__*float_par_vals['cutmax']
-        elif float_par_vals['fgmmin'] < float_par_vals['cutmax']:
-            raise ConvError("fine_gmax_min must be greater or equal than " + str(__gscale__) + "*cutoff_max for fine_gmax_mode = MAX")
+            float_par_vals['fgmmin'] = __gscale__**2*float_par_vals['cutmax']
+        elif float_par_vals['fgmmin'] < __gscale__**2*float_par_vals['cutmax']:
+            raise ConvError("fine_gmax_min must be greater or equal than " + str(__gscale__**2) + "*cutoff_max for fine_gmax_mode = MAX")
         if float_par_vals['fgmmax'] is None:
             float_par_vals['fgmmax'] = float_par_vals['fgmmin']+3.0*float_par_vals['fgmstep']
-        elif float_par_vals['fgmmax'] <= float_par_vals['cutmax']:
-            raise ConvError("fine_gmax_max must be greater than " + str(__gscale__) + "*cutoff_max for fine_gmax_mode = MAX")
+        elif float_par_vals['fgmmax'] <= __gscale__**2*float_par_vals['cutmax']:
+            raise ConvError("fine_gmax_max must be greater than " + str(__gscale__**2) + "*cutoff_max for fine_gmax_mode = MAX")
         elif float_par_vals['fgmmax'] <= float_par_vals['fgmmin']:
             raise ConvError("Invalid fine Gmax range defined in .conv file")
     else:
@@ -1016,25 +1031,29 @@ if (str_par_vals['ctsk'] in ("clear")):
         if os.path.isfile(seedname + suff):
             to_del_files += [seedname + suff]
 
-    print "The following folders will be deleted:"
-
-    for f in to_del_fold:
-        sys.stdout.write(f + ' ')
-
-    print "\nThe following files will be deleted:"
-
-    for f in to_del_files:
-        sys.stdout.write(f + ' ')
-
-    to_del = raw_input("\nContinue (y/N)?")
-
-    if to_del.lower() == 'y':
-
+    if (len(to_del_fold) > 0):
+        print "The following folders will be deleted:"
         for f in to_del_fold:
-            shutil.rmtree(f)
-        for f in to_del_files:
-            os.remove(f)
+            sys.stdout.write(f + ' ')
+        print ""
 
+    if (len(to_del_files) > 0):
+        print "The following files will be deleted:"
+        for f in to_del_files:
+            sys.stdout.write(f + ' ')
+        print ""
+
+    if ((len(to_del_fold) + len(to_del_files)) == 0):
+        print "No folders or files to delete found"
+    else:
+        to_del = raw_input("Continue (y/N)?")
+    
+        if to_del.lower() == 'y':
+    
+            for f in to_del_fold:
+                shutil.rmtree(f)
+            for f in to_del_files:
+                os.remove(f)
 
 # PHASE 1 - INPUT
 # Produce a batch of folders and files with the various configurations
@@ -1114,6 +1133,7 @@ if (str_par_vals['ctsk'] in ("input", "inputrun", "all")):
     # Build an array with the simulation conditions to employ condensed into one
 
     allrange = []
+    fgm_cutoff = cutrange[-1] if str_par_vals['fgmmode'] == "max" else cutrange[0]
     conv_tab_file.write("cutoff:\t")
     for cut in cutrange:
         conv_tab_file.write(str(cut) + " eV\t")
@@ -1125,7 +1145,7 @@ if (str_par_vals['ctsk'] in ("input", "inputrun", "all")):
     conv_tab_file.write("\nfine_gmax:\t" + (str(fgmrange[0]) + " eV\t" if fgmrange[0] is not None else "N/A"))
     for fgm in fgmrange[1:]:
         conv_tab_file.write(str(fgm) + " eV\t")
-        allrange.append({'cut': cutrange[0], 'kpn': kpnrange[0], 'fgm': fgm, 'scan': 'fgm'})
+        allrange.append({'cut': fgm_cutoff, 'kpn': kpnrange[0], 'fgm': fgm, 'scan': 'fgm'})
     conv_tab_file.close()
 
     foldname = None
@@ -1251,13 +1271,14 @@ if (str_par_vals["ctsk"] in ("all", "output")):
     conv_fgm = (str_par_vals["fgmmode"] is not None)
 
     if (allrange is None):
+        fgm_cutoff = cutrange[-1] if str_par_vals['fgmmode'] == "max" else cutrange[0]
         allrange = []
         for cut in cutrange:
             allrange.append({'cut': cut, 'kpn': kpnrange[0], 'fgm': fgmrange[0], 'scan': 'cut'})
         for kpn in kpnrange[1:]:
             allrange.append({'cut': cutrange[0], 'kpn': kpn, 'fgm': fgmrange[0], 'scan': 'kpn'})
         for fgm in fgmrange[1:]:
-            allrange.append({'cut': cutrange[0], 'kpn': kpnrange[0], 'fgm': fgm, 'scan': 'kpn'})
+            allrange.append({'cut': fgm_cutoff, 'kpn': kpnrange[0], 'fgm': fgm, 'scan': 'fgm'})
 
     cutnrg = []
     cutfor = []
@@ -1276,6 +1297,8 @@ if (str_par_vals["ctsk"] in ("all", "output")):
         cut = pars['cut']
         kpn = pars['kpn']
         fgm = pars['fgm']
+
+        scan = pars['scan']
 
         jobname = jname(seedname, cut, kpn, fgm)
 
@@ -1303,10 +1326,11 @@ if (str_par_vals["ctsk"] in ("all", "output")):
         if castep_data['cut'] is None or castep_data['kpn'] is None or castep_data['cut'] != cut or castep_data['kpn'] != kpn:
             sys.exit("ERROR - Simulation parameters in " + filepath + " do not correspond to expected values")
 
-        print cut_to_k(fgm), castep_data['fgm']
         if conv_fgm and (castep_data['fgm'] is None or castep_data['fgm'] != round_digits(cut_to_k(fgm), 4)):
-            pass
-            #sys.exit("ERROR - Simulation parameters in " + filepath + " do not correspond to expected values")
+            if scan in ('fgm', 'kpn'):
+                sys.exit("ERROR - Simulation parameters in " + filepath + " do not correspond to expected values")
+            else:
+                print "WARNING - fine_Gmax value used in " + filepath + " is greater than the set value of fine_gmax_min due to the higher cutoff"
 
         if castep_data['nrg'] is None or castep_data['for'] is None:
             sys.exit("ERROR - Incomplete simulation results in " + filepath + " (missing energy or forces)")
@@ -1317,12 +1341,12 @@ if (str_par_vals["ctsk"] in ("all", "output")):
         if castep_data['atom_n'] is None:
             sys.exit("ERROR - Corrupted " + filepath + " file")
 
-        if (pars['scan'] == 'cut'):
+        if (scan == 'cut'):
             cutnrg.append(castep_data['nrg'])
             cutfor.append(castep_data['for'])
             if calc_str:
                 cutstr.append(castep_data['str'])
-        elif (pars['scan'] == 'kpn'):
+        elif (scan == 'kpn'):
             if (len(kpnnrg) == 0):
                 kpnnrg.append(cutnrg[0])
                 kpnfor.append(cutfor[0])
@@ -1332,40 +1356,66 @@ if (str_par_vals["ctsk"] in ("all", "output")):
             kpnfor.append(castep_data['for'])
             if calc_str:
                 kpnstr.append(castep_data['str'])
+        elif (scan == 'fgm'):
+            if (len(fgmnrg) == 0):
+                fgmnrg.append(cutnrg[0])
+                fgmfor.append(cutfor[0])
+                if calc_str:
+                    fgmstr.append(cutstr[0])
+            fgmnrg.append(castep_data['nrg'])
+            fgmfor.append(castep_data['for'])
+            if calc_str:
+                fgmstr.append(castep_data['str'])
 
     # Save the results in data files
 
     cutfile = open(seedname + "_cut_conv.dat", 'w')
-    kpnfile = open(seedname + "_kpn_conv.dat", 'w')
-
     cutfile.write("Cutoff (eV)\tEnergy (eV)\tForces (eV/A)" + ("\tTotal stresses (GPa)" if calc_str else "") + "\n")
-    kpnfile.write("kpoints (tot)\tEnergy (eV)\tForces (eV/A)" + ("\tTotal stresses (GPa)" if calc_str else "") + "\n")
 
     for i in range(0, len(cutrange)):
         cutfile.write(str(cutrange[i]) + '\t\t' + str(cutnrg[i]) + '\t\t' + str(cutfor[i]) + ('\t\t' + str(cutstr[i]) if calc_str else '') + '\n')
+    
+    cutfile.close()
+
+    kpnfile = open(seedname + "_kpn_conv.dat", 'w')
+    kpnfile.write("kpoints (tot)\tEnergy (eV)\tForces (eV/A)" + ("\tTotal stresses (GPa)" if calc_str else "") + "\n")
+    
     for i in range(0, len(kpnrange)):
         kpnfile.write(str(kpnrange[i][0]*kpnrange[i][1]*kpnrange[i][2]) + '\t\t' + str(kpnnrg[i]) + '\t\t' + str(kpnfor[i]) + ('\t\t' + str(kpnstr[i]) if calc_str else '') + '\n')
 
-    cutfile.close()
     kpnfile.close()
 
+    if (conv_fgm):
+        fgmfile = open(seedname + "_fgm_conv.dat", 'w')
+        fgmfile.write("Fine Gmax (eV)\tEnergy (eV)\tForces (eV/A)" + ("\tTotal stresses (GPa)" if calc_str else "") + "\n")
+    
+        for i in range(0, len(fgmrange)):
+            fgmfile.write(str(fgmrange[i]) + '\t\t' + str(fgmnrg[i]) + '\t\t' + str(fgmfor[i]) + ('\t\t' + str(fgmstr[i]) if calc_str else '') + '\n')
+        
+        fgmfile.close()
+    
     # Make an estimate of the best values
 
     conv_data = {}
     conv_data['cut'] = {'range': cutrange,
         'step': float_par_vals['cutstep'],
         'nrg': [x/atom_n for x in cutnrg],
-        'for': cutfor,}
+        'for': cutfor}
     conv_data['kpn'] = {'range': [sum(k) for k in kpnrange],
         'step': int_par_vals['kpnstep']*3,
         'nrg': [x/atom_n for x in kpnnrg],
         'for': kpnfor}
+    conv_data['fgm'] = {'range': fgmrange,
+        'step': float_par_vals['fgmstep'],
+        'nrg': [x/atom_n for x in fgmnrg],
+        'for': fgmfor}
 
     if bool_par_vals['cnvstr']:
         conv_data['cut']['str'] = cutstr
         conv_data['kpn']['str'] = kpnstr
+        conv_data['fgm']['str'] = fgmstr
 
-    conv_estimates(conv_data, calc_str)
+    opt_estimates = conv_estimates(conv_data, calc_str)
 
     # Finally, let's do the plotting
 

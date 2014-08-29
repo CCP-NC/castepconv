@@ -1,4 +1,4 @@
-_x_types = {'cut': 'Cutoff (eV)', 'kpn': 'k-points'}
+_x_types = {'cut': 'Cutoff (eV)', 'kpn': 'k-points', 'fgm': 'Fine Gmax (eV)'}
 _y_types = {'for': 'Maximum force (ev/Ang)', 'str': 'Maximum stress (GPa)'}
 
 def gp_graph(seedname, cnvstr=False):

@@ -298,6 +298,9 @@ def strip_cellfile(clines):
 
     for l in clines:
 
+        if len(l) == 0:
+            continue
+        
         if not l[0] == '#':
 
             l_low = l.lower()
@@ -367,7 +370,11 @@ def strip_cellfile(clines):
                 if "%endblock" in l_low:
                     to_strip = False
                 continue
-
+        
+        # If the last line does not have a newline for some reason, add it for good measure
+        if l[-1] != '\n':
+            l = l + '\n'
+        
         stripped.append(l)
 
     if abc is None:
@@ -414,6 +421,10 @@ def strip_paramfile(plines):
         if "fine_gmax" in l_split[0] and str_par_vals["fgmmode"] is not None:
             continue
 
+        # If the last line does not have a newline for some reason, add it for good measure
+        if l[-1] != '\n':
+            l = l + '\n'
+        
         stripped.append(l)
 
     return stripped
@@ -623,15 +634,17 @@ def conv_estimates(seedname, data, cnvstr=False):
     out_string += "Convergence results:\n"
 
     for x in ordered_x:
+
         x_name = data_x[x][0]
         x_unit = data_x[x][1]
+
+        # Skip if there is no X convergence performed
+        if None in data[x]['range']:
+            continue
 
         opt_vals[x] = {}
         
         for y in ordered_y:
-
-            if y in ('range', 'rangestr', 'step'):
-                continue
 
             opt_vals[x][y] = None
 
@@ -680,6 +693,9 @@ def conv_estimates(seedname, data, cnvstr=False):
 
         max_vals[x] = -1
         max_str[x] = ''
+
+        if x not in opt_vals:
+            continue
 
         for y in opt_vals[x]:
 

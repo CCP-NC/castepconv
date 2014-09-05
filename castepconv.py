@@ -646,10 +646,10 @@ def conv_estimates(seedname, data, cnvstr=False):
         
         for y in ordered_y:
 
-            opt_vals[x][y] = None
-
             if y == 'str' and not cnvstr:
                 continue
+                
+            opt_vals[x][y] = None
 
             dataset = data[x][y]
             y_name = data_y[y][0]
@@ -691,11 +691,11 @@ def conv_estimates(seedname, data, cnvstr=False):
 
     for x in ordered_x:
 
-        max_vals[x] = -1
-        max_str[x] = ''
-
         if x not in opt_vals:
             continue
+
+        max_vals[x] = -1
+        max_str[x] = ''
 
         for y in opt_vals[x]:
 

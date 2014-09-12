@@ -1,3 +1,5 @@
+import os
+
 _x_types = {'cut': 'Cutoff (eV)', 'kpn': 'k-points', 'fgm': 'Fine Gmax (eV)'}
 _y_types = {'for': 'Maximum force (ev/Ang)', 'str': 'Maximum stress (GPa)'}
 
@@ -8,6 +10,9 @@ def gp_graph(seedname, cnvstr=False):
             if y == 'str' and not cnvstr:
                 continue
 
+            # Check if source .dat file exists
+            if not os.path.isfile(os.path.join(seedname + '_' + x  + ('_str' if y == 'str' else '') + '_conv.dat')):
+                continue
             out_file = open(seedname + '_' + x  + ('_str' if y == 'str' else '') + '_conv.gp', 'w')
 
             out_file.write('set xlabel "' + _x_types[x] + '"\n')

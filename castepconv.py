@@ -202,7 +202,6 @@ def rindex_cont(my_list, my_el):
     for i in range(len(my_list), 0, -1):
         if my_el in my_list[i-1]:
             return i-1
-
     return None
 
 # Parse .conv file for convergence calculation options
@@ -1072,9 +1071,9 @@ except AssertionError as e:
 if (str_par_vals['ctsk'] in ("clear")):
 
     # Create a list of files and folders to delete
-
+    
     to_del_fold = set(glob.glob(seedname + "_cut_*_kpn_*_fgm_*"))
-    to_del_fold.union(set(glob.glob(seedname + "_cut_*_kpn_*")))
+    to_del_fold = to_del_fold.union(set(glob.glob(seedname + "_cut_*_kpn_*")))
     
     if os.path.exists(seedname + "_conv"):
         to_del_fold.add(seedname + "_conv")

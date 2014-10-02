@@ -9,7 +9,8 @@
 import sys, time, math, os, shutil, glob, re
 import subprocess as sp
 
-from cconv_graphs import gp_graph, agr_graph
+from cconv.graphs import gp_graph, agr_graph
+from cconv.vars import xvar_list, yvar_list
 
 __vers_number__ = "0.9.5"
 
@@ -90,9 +91,9 @@ float_par_names = {
 "fine_gmax_max"     : "fgmmax",
 "fine_gmax_step"    : "fgmstep",
 "displace_atoms"    : "displ",
-"final_energy_delta": "nrgtol",
-"forces_delta"      : "fortol",
-"stresses_delta"    : "strtol"
+"final_energy_delta": "nrgdelta",
+"forces_delta"      : "fordelta",
+"stresses_delta"    : "strdelta"
 }
 
 float_par_vals = {
@@ -103,9 +104,9 @@ float_par_vals = {
 "fgmmax" : None,            # eV
 "fgmstep": 100.0,           # eV
 "displ"  : 0.0,             # Ang
-"nrgtol" : 0.1000E-04,      # eV/atom
-"fortol" : 0.5000E-01,      # eV/Ang
-"strtol" : 0.1              # GPa
+"nrgdelta" : 0.1000E-04,      # eV/atom
+"fordelta" : 0.5000E-01,      # eV/Ang
+"strdelta" : 0.1              # GPa
 }
 
 int_par_names = {
@@ -653,7 +654,7 @@ def conv_estimates(seedname, data, cnvstr=False):
             dataset = data[x][y]
             y_name = data_y[y][0]
             y_unit = data_y[y][1]
-            tol = float_par_vals[y+"tol"]
+            tol = float_par_vals[y+"delta"]
 
             # Cases where we can't say anything meaningful
             if len(dataset) < 2:

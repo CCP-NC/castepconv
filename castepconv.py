@@ -84,44 +84,44 @@ str_par_vals = {
 }
 
 float_par_names = {
-"cutoff_min"        : "cutmin",
-"cutoff_max"        : "cutmax",
-"cutoff_step"       : "cutstep",
-"fine_gmax_min"     : "fgmmin",
-"fine_gmax_max"     : "fgmmax",
-"fine_gmax_step"    : "fgmstep",
 "displace_atoms"    : "displ",
-"final_energy_delta": "nrgdelta",
-"forces_delta"      : "fordelta",
-"stresses_delta"    : "strdelta"
 }
 
 float_par_vals = {
-"cutmin" : 400.0,           # eV
-"cutmax" : 800.0,           # eV
-"cutstep": 100.0,           # eV
-"fgmmin" : None,            # eV
-"fgmmax" : None,            # eV
-"fgmstep": 100.0,           # eV
 "displ"  : 0.0,             # Ang
-"nrgdelta" : 0.1000E-04,      # eV/atom
-"fordelta" : 0.5000E-01,      # eV/Ang
-"strdelta" : 0.1              # GPa
 }
 
 int_par_names = {
-"kpoint_n_min"      : "kpnmin",
-"kpoint_n_max"      : "kpnmax",
-"kpoint_n_step"     : "kpnstep",
 "max_parallel_jobs" : "maxjobs"
 }
 
 int_par_vals = {
-"kpnmin"  : 1,
-"kpnmax"  : 4,
-"kpnstep" : 1,
 "maxjobs" : 0
 }
+
+# Fill in automatically with the remaining names/keys from xvar_list
+
+for xv_i in xvar_list:
+    xv = xvar_list[xv_i]
+    if xv.vtype is int:
+        for v in xv.vars:
+            int_par_names[xv.name + '_' + v] = xv.sym+v
+            int_par_vals[xv.sym+v] = xv.vars[v]
+    elif xv.vtype is float:
+        for v in xv.vars:
+            float_par_names[xv.name + '_' + v] = xv.sym+v
+            float_par_vals[xv.sym+v] = xv.vars[v]
+
+for yv_i in yvar_list:
+    yv = yvar_list[yv_i]
+    if yv.vtype is int:
+        for y in yv.vars:
+            int_par_names[yv.name + '_' + v] = yv.sym+v
+            int_par_vals[yv.sym+v] = yv.vars[v]
+    elif yv.vtype is float:
+        for v in yv.vars:
+            float_par_names[yv.name + '_' + v] = yv.sym+v
+            float_par_vals[yv.sym+v] = yv.vars[v]
 
 bool_par_names = {
 "converge_stress"   : "cnvstr",
@@ -157,7 +157,6 @@ fgmrange = None
 allrange = None
 
 abc_len = None
-kpn_base = (1, 1, 1)
 pseudo_pots = None
 has_fix_occ = False
 sscript = None

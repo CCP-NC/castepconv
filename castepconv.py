@@ -6,10 +6,11 @@
 # Copyright 2013 Science and Technology Facilities Council
 # This software is distributed under the terms of the GNU General Public License (GNU GPL)
 
-import sys, time, math, os, shutil, glob, re
+import sys, time, math, os, shutil, glob, re, copy
 import subprocess as sp
 
-from cconv_graphs import gp_graph, agr_graph
+from cconv.graphs import gp_graph, agr_graph
+from cconv.io_freeform import io_freeform_file, io_freeform_error
 
 __vers_number__ = "0.9.5"
 
@@ -279,105 +280,71 @@ def parse_conv_tab_file(cfile):
 # Strip .cell file from unnecessary lines to get only the ones we care for (i.e. remove all reference to kpoints, we're going to put those in ourselves)
 # Also read cell parameters and construct the proper kpn_base
 
-def strip_cellfile(clines):
+def strip_cellfile(fname):
 
-    stripped = []
+    stripped = io_freeform_file(fname)
 
-    to_strip = False
-    to_read_abc = False
-    to_read_cart = False
-    to_read_pot = False
+    # Parse/remove all undesired blocks
 
-    abc = None
-    u = 1.0
-    kbase = [1, 1, 1]
-    ppot = None
+    abc   = None
+    u     = 1.0
+    kbase = [1.0, 1.0, 1.0]
+    ppot  = None
 
     hkl_data = []
 
-    for l in clines:
+    # Remove everything having to do with kpoints
+    
+    for k in ("kpoints_mp_grid", "kpoint_mp_grid", "kpoints_mp_spacing", "kpoint_mp_spacing", "kpoints_list", "kpoint_list"):
+        stripped.freeform_remove(k)
 
-        if len(l) == 0:
-            continue
-        
-        if not l[0] == '#':
-
-            l_low = l.lower()
-
-            if to_read_abc:
-                l_split = l_low.strip().split()
-                if l_split[0] in length_units:
-                    u = length_units[l_split[0]]
-                else:
-                    try:
-                        hkl_data.append([u*float(x) for x in l_split])
-                    except ValueError:
-                        raise CellError('Bad formatting in .cell file LATTICE_ABC block')
-                    if (len(hkl_data) == 1):
-                        abc = tuple(hkl_data[0])
-                    to_read_abc = (len(hkl_data) < 2)
-            if to_read_cart:
-                l_split = l_low.strip().split()
-                if l_split[0] in length_units:
-                    u = length_units[l_split[0]]
-                else:
-                    try:
-                        hkl_data.append([u*float(x) for x in l_split])
-                    except ValueError:
-                        raise CellError('Bad formatting in .cell file LATTICE_CART block')
-                    if (len(hkl_data) == 3):
-                        abc = tuple([math.sqrt(sum([x**2.0 for x in hkl])) for hkl in hkl_data])
-                    to_read_cart = (len(hkl_data) < 3)
-            if to_read_pot:
-                l_split = l.strip().split()
-                if "%endblock" in l_low:
-                    if not "species_pot" in l_low:
-                        raise CellError('Bad formatting in .cell file SPECIES_POT block')
-                    else:
-                        to_read_pot = False
-                else:
-                    try:
-                        ppot.append([l_split[0], l_split[1]])
-                    except ValueError:
-                        raise CellError('Bad formatting in .cell file SPECIES_POT block')
-                continue
-
-            if any(kword in l_low for kword in ["kpoints_mp_grid", "kpoint_mp_grid",
-                "kpoints_mp_spacing", "kpoint_mp_spacing"]):
-                continue
-            if "%block" in l_low:
-                if "kpoints_list" in l_low or "kpoint_list" in l_low:
-                    to_strip = True
-                    continue
-                elif "lattice_abc" in l_low:
-                    if abc is not None:
-                        raise CellError('Duplicated LATTICE_* block in .cell file')
-                    to_read_abc = True
-                    abc = [-1.0, -1.0, -1.0]
-                elif "lattice_cart" in l_low:
-                    if abc is not None:
-                        raise CellError('Duplicated LATTICE_* block in .cell file')
-                    to_read_cart = True
-                    abc = [-1.0, -1.0, -1.0]
-                elif "species_pot" in l_low:
-                    if ppot is not None:
-                        raise CellError('Duplicated SPECIES_POT block in .cell file')
-                    to_read_pot = True
-                    ppot = []
-                    continue
-            if to_strip:
-                if "%endblock" in l_low:
-                    to_strip = False
-                continue
-        
-        # If the last line does not have a newline for some reason, add it for good measure
-        if l[-1] != '\n':
-            l = l + '\n'
-        
-        stripped.append(l)
+    # Read lattice parameters
+    if stripped.freeform_present("lattice_cart"):
+        abc_block = stripped.freeform_block("lattice_cart")
+        for l in abc_block:
+            l_split = l.lower().strip().split()
+            if l_split[0] in length_units:
+                u = length_units[l_split[0]]
+            else:
+                try:
+                    hkl_data.append([u*float(x) for x in l_split])
+                except ValueError:
+                    raise CellError('Bad formatting in .cell file LATTICE_CART block')
+                if (len(hkl_data) == 3):
+                    abc = tuple([math.sqrt(sum([x**2.0 for x in hkl])) for hkl in hkl_data])
+                if (len(hkl_data) > 3):
+                    raise CellError('Bad formatting in .cell file LATTICE_CART block')
+    
+    if stripped.freeform_present("lattice_abc"):
+        if abc is not None:
+            raise CellError('Duplicated LATTICE_* block in .cell file')
+        abc_block = stripped.freeform_block("lattice_abc")
+        l_split = l.lower().strip().split()
+        if l_split[0] in length_units:
+            u = length_units[l_split[0]]
+        else:
+            try:
+                hkl_data.append([u*float(x) for x in l_split])
+            except ValueError:
+                raise CellError('Bad formatting in .cell file LATTICE_ABC block')
+            if (len(hkl_data) == 1):
+                abc = tuple(hkl_data[0])
+            if (len(hkl_data) >= 2):
+                raise CellError('Bad formatting in .cell file LATTICE_ABC block')
 
     if abc is None:
         raise CellError('.cell file does not contain a LATTICE_* block')
+    
+    # Read pseudopotentials
+    if stripped.freeform_present("species_pot"):
+        ppot = []
+        pot_block = stripped.freeform_block("species_pot")
+        for l in pot_block:
+            l_split = l.strip().split()
+            try:
+                ppot.append([l_split[0], l_split[1]])
+            except IndexError:
+                raise CellError('Bad formatting in .cell file SPECIES_POT block')
 
     if len(hkl_data) == 2:
         for i in range(0, 3):
@@ -392,90 +359,73 @@ def strip_cellfile(clines):
 
 # Strip .param file from unnecessary lines to get only the ones we care for (i.e. remove all reference to task and cutoff)
 
-def strip_paramfile(plines):
-
+def strip_paramfile(fname):
+    
     global bool_par_vals, has_fix_occ
 
-    stripped = []
+    stripped = io_freeform_file(fname)
 
-    for l in plines:
+    # Is occupancy fixed?
+    if stripped.freeform_present('fix_occupancy'):
+        has_fix_occ = stripped.freeform_boolean('fix_occupancy')
 
-        l_split = l.strip().lower().replace(':', ' ').replace('=', ' ').split()
+    # Remove keywords that need to be stripped
+    for k in ("cut_off_energy", "cutoff_energy"):
+        stripped.freeform_remove(k)
 
-        # Skip empty lines
-
-        if len(l_split) == 0:
-            continue
-        if "fix_occupancy" in l_split[0]:
-            if len(l_split) > 1 and l_split[1] == "true":
-                has_fix_occ = True
-        if "task" in l_split[0]:
-            continue
-        if "cut_off_energy" in l_split[0]:
-            continue
-        if "calculate_stress" in l_split[0] and bool_par_vals["cnvstr"]:
-            continue
-        if "reuse" in l_split[0] and bool_par_vals["sruse"]:
-            continue
-        if "fine_gmax" in l_split[0] and str_par_vals["fgmmode"] is not None:
-            continue
-
-        # If the last line does not have a newline for some reason, add it for good measure
-        if l[-1] != '\n':
-            l = l + '\n'
-        
-        stripped.append(l)
+    if bool_par_vals['cnvstr']:
+        stripped.freeform_remove('calculate_stress')
+    if bool_par_vals['sruse']:
+        stripped.freeform_remove('continuation')
+        stripped.freeform_remove('reuse')
+    if str_par_vals['fgmmode'] is not None:
+        stripped.freeform_remove('fine_gmax')
 
     return stripped
 
 # Displace atoms by a small amount in cellfile if needed to have nonzero forces
 
-def displace_cell_atoms(clines, abc, d):
+def displace_cell_atoms(cfile, abc, d):
 
-    to_displ_abs = False
-    to_displ_frac = False
     u = None
 
-    clines_displ = []
+    pos_is_abs = cfile.freeform_present('positions_abs')    # Are positions absolute or fractionary?
+    if pos_is_abs:
+        pos_block = cfile.freeform_block('positions_abs')
+    else:
+        pos_block = cfile.freeform_block('positions_frac')
 
-    for i, l in enumerate(clines):
+    pos_block_displ = []
 
-        if not l[0] == '#':
-
-            l_low = l.lower()
-
-            if to_displ_abs or to_displ_frac:
-                l_split = l.strip().split()
-                if "%endblock" in l_low:
-                    to_displ_abs = False
-                    to_displ_frac = False
-                elif to_displ_abs and l_split[0].lower() in length_units:
-                    u = length_units[l_split[0].lower()]
-                    l = "ang\n"
+    for i, l in enumerate(pos_block):
+        l_split = l.strip().split()
+        if pos_is_abs and l_split[0].lower() in length_units:
+            u = length_units[l_split[0].lower()]
+            pos_block_displ.append('ang\n')
+        else:
+            if len(l_split) != 4:
+                raise CellError('Bad formatting in .cell file POSITION_* block')
+            try:
+                xyz = [float(x) for x in l_split[1:]]
+                # The displacement is in alternated directions, since otherwise you'd still get an equilibrium structure
+                # Won't work for single atom unit cells. This needs fixing. It might also break if there are symmetries in the system.
+                fac = (i%2)*2-1
+                if pos_is_abs:
+                    #l = l_split[0] + '\t' + str(u*xyz[0]+fac*d) + '\t' + str(u*xyz[1]+fac*d) + '\t' + str(u*xyz[2]+fac*d) + '\n'
+                    l = '{0} {1} {2} {3}'.format(*[l_split[0]] + [u*x+fac*d for x in xyz])
                 else:
-                    if len(l_split) != 4:
-                        raise CellError('Bad formatting in .cell file POSITION_* block')
-                    try:
-                        xyz = [float(x) for x in l_split[1:]]
-                        # The displacement is in alternated directions, since otherwise you'd still get an equilibrium structure
-                        # Won't work for single atom unit cells. This needs fixing. It might also break if there are symmetries in the system.
-                        fac = (i%2)*2-1
-                        if to_displ_abs:
-                            l = l_split[0] + '\t' + str(u*xyz[0]+fac*d) + '\t' + str(u*xyz[1]+fac*d) + '\t' + str(u*xyz[2]+fac*d) + '\n'
-                        elif to_displ_frac:
-                            l = l_split[0] + '\t' + str(xyz[0]+fac*d/abc[0]) + '\t' + str(xyz[1]+fac*d/abc[1]) + '\t' + str(xyz[2]+fac*d/abc[2]) + '\n'
-                    except ValueError:
-                        raise CellError('Bad formatting in .cell file POSITION_* block')
-            if "%block" in l_low:
-                if "positions_abs" in l_low:
-                    to_displ_abs = True
-                    u = 1.0
-                elif "positions_frac" in l_low:
-                    to_displ_frac = True
+                    #l = l_split[0] + '\t' + str(xyz[0]+fac*d/abc[0]) + '\t' + str(xyz[1]+fac*d/abc[1]) + '\t' + str(xyz[2]+fac*d/abc[2]) + '\n'
+                    l = '{0} {1} {2} {3}'.format(*[l_split[0]] + [x+fac*d/abc[j] for j, x in enumerate(xyz)])
+            except ValueError:
+                raise CellError('Bad formatting in .cell file POSITION_* block')
+            pos_block_displ.append(l)
+    
+    if pos_is_abs:
+        cfile.freeform_block('positions_abs', pos_block_displ)
+    else:
+        cfile.freeform_block('positions_frac', pos_block_displ)
 
-        clines_displ.append(l)
-
-    return clines_displ
+    return cfile
 
 # Waits for a running job until it's finished
 
@@ -780,34 +730,28 @@ def create_conv_folder(foldname, jobname, cut, kpn, fgm, prev_jobname=None):
         iscript.flush()
         iscript.close()
 
-    for l in stripped_cell:
-        icell.write(l)
-
+    icell_fform = copy.copy(stripped_cell)
     # Write pseudopotentials block
-
-    if pseudo_pots is not None and len(pseudo_pots) > 0:
-        icell.write("%BLOCK SPECIES_POT\n")
-        for p in pseudo_pots:
-            icell.write(p[0] + '\t' + p[1] + '\n')
-        icell.write("%ENDBLOCK SPECIES_POT\n")
-
+    if pseudo_pots is not None:
+        icell_fform.freeform_block("species_pot", ['{0}\t{1}'.format(*p) for p in pseudo_pots])
     # Write kpoint grid
-
-    icell.write("\nkpoint_mp_grid " + kgrid(kpn) + "\n")
+    icell_fform.freeform_integer_vector("kpoints_mp_grid", kpn)
+    
+    icell.write(icell_fform.freeform_print())
     icell.close()
 
     # Write param file
-    
-    iparam.write("task:\tSinglePoint\n")
-    iparam.write("cut_off_energy:\t" + str(cut) + " eV\n")
-    for l in stripped_param:
-        iparam.write(l)
+
+    iparam_fform = copy.copy(stripped_param)
+    iparam_fform.freeform_string('task', 'SinglePoint')
+    iparam_fform.freeform_physical('cut_off_energy', 'E', cut, 'ev')
     if prev_jobname is not None and bool_par_vals["sruse"]:
-        iparam.write("reuse:\t" + prev_jobname + ".check\n")
+        iparam_fform.freeform_string('reuse', prev_jobname + '.check')
     if bool_par_vals["cnvstr"]:
-        iparam.write("calculate_stress:\ttrue\n")
+        iparam_fform.freeform_boolean('calculate_stress', True)
     if fgm is not None:
-        iparam.write("fine_gmax:\t" + str(cut_to_k(fgm)) + "\n")
+        iparam_fform.freeform_real('fine_gmax', cut_to_k(fgm))
+    iparam.write(iparam_fform.freeform_print())
     iparam.close()
 
 # Run a job, eventually wait for its completion, etc.
@@ -1031,9 +975,8 @@ if (str_par_vals['ctsk'] != "output"):
     print "Reading " + seedname + ".cell"
 
     try:
-        job_cellfile = open(seedname + ".cell", 'r')
-        cellfile_lines = job_cellfile.readlines()
-    except IOError:
+        assert os.path.isfile(seedname + ".cell")
+    except AssertionError:
         sys.exit("ERROR - .cell file for job " + seedname + " not found")
 
     print "Reading " + seedname + ".param"
@@ -1044,16 +987,10 @@ else:
 # This is needed even for output tasks since the program needs to be aware whether fix_occupancy is used
 
 try:
-    job_paramfile = open(seedname + ".param", 'r')
-    paramfile_lines = job_paramfile.readlines()
-except IOError:
+    stripped_param = strip_paramfile(seedname + ".param")
+except io_freeform_error:
     print("WARNING - .param file for job " + seedname + " not found")
-    paramfile_lines = None
-
-if paramfile_lines is not None:
-    stripped_param = strip_paramfile(paramfile_lines)
-else:
-    stripped_param = []
+    stripped_param = io_freeform_file()
 
 # Override task in .conv file with command line options
 
@@ -1124,7 +1061,7 @@ if (str_par_vals['ctsk'] in ("input", "inputrun", "all")):
     # First create a "stripped" version of cell and param files, to use as a template for the new files to generate
 
     try:
-        stripped_cell, abc_len, kpn_base, pseudo_pots = strip_cellfile(cellfile_lines)
+        stripped_cell, abc_len, kpn_base, pseudo_pots = strip_cellfile(seedname + ".cell")
     except CellError as CE:
         sys.exit("ERROR - " + str(CE))
 

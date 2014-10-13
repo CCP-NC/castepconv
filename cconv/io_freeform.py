@@ -171,7 +171,7 @@ class io_freeform_file(object):
             
             if read_block:
                 if lsplit[0].upper() == '%ENDBLOCK':
-                    if len(lsplit) == 1 or lsplit[1] != keyw:
+                    if len(lsplit) == 1 or lsplit[1].upper() != keyw:
                         raise io_freeform_error("Out of place end of block at line %i in io_freeform_file" % i)
                     else:
                         read_block = False

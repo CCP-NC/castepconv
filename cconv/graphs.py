@@ -11,7 +11,7 @@ def gp_graph(seedname, cnvstr=False):
                 continue
 
             # Check if source .dat file exists
-            if not os.path.isfile(os.path.join(seedname + '_' + x  + ('_str' if y == 'str' else '') + '_conv.dat')):
+            if not os.path.isfile(os.path.join(seedname + '_' + x  + '_conv.dat')):
                 continue
             out_file = open(seedname + '_' + x  + ('_str' if y == 'str' else '') + '_conv.gp', 'w')
 

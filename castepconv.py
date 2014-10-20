@@ -226,14 +226,12 @@ def parse_convfile(cfile):
             #Skip empty lines
             continue
         else:
-            cline = cline.split(':')
+            cline = cline.split(':', 1)
         if (len(cline) < 2):
             raise ConvError("Bad formatting in .conv file at line " + str(i))
         par_name = cline[0].strip().lower()
         if (par_name in str_par_names):
-            if str_par_names[par_name] == 'rcmd':
-                cline[1] = ' '.join(cline[1:])
-            elif str_par_names[par_name] != 'subs':  # If it IS subs, we don't need to alter it
+            if str_par_names[par_name] not in ('rcmd', 'subs'): # If it IS rcmd or subs, we don't need to alter it
                 cline[1] = cline[1].lower()
             str_par_vals[str_par_names[par_name]] = cline[1].strip()
         elif (par_name in float_par_names):

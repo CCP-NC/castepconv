@@ -31,7 +31,13 @@ def agr_graph(seedname, data, cnvstr=False):
 
     # data needs to be a dict formatted as: {'cut':  {'range': [...], 'nrg': [...], 'for': [...] etc.}}
 
+
     for x in _x_types:
+
+        if x == 'fgm' and len(data[x]['nrg']) == 0:
+            # No fine grid convergence was performed
+            continue
+
         for y in _y_types:
             if y == 'str' and not cnvstr:
                 continue
@@ -44,7 +50,7 @@ def agr_graph(seedname, data, cnvstr=False):
             y1 = data[x]['nrg']
             y2 = data[x][y]
 
-            x1rng  = (min(x1), max(x1))
+            x1rng = (min(x1), max(x1))
             y1rng = (min(y1)-0.1*(max(y1)-min(y1)), max(y1)+0.1*(max(y1)-min(y1)))
             y2rng = (min(y2)-0.1*(max(y2)-min(y2)), max(y2)+0.1*(max(y2)-min(y2)))
 

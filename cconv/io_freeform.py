@@ -159,6 +159,11 @@ class io_freeform_file(object):
                 l = l[:i_c]
             except ValueError:
                 pass    # No comments in this line
+            try:
+                i_c = l.index('!')
+                l = l[:i_c]
+            except ValueError:
+                pass    # No comments in this line
             
             lsplit = l.replace(':', ' ').split()
 

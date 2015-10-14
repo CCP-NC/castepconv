@@ -12,7 +12,7 @@ import subprocess as sp
 from cconv.graphs import gp_graph, agr_graph
 from cconv.io_freeform import io_freeform_file, io_freeform_error
 
-__vers_number__ = "0.9.5"
+__vers_number__ = "0.9.6"
 
 # Try importing argparse - if the Python version is too old, use optparse
 
@@ -317,18 +317,19 @@ def strip_cellfile(fname):
         if abc is not None:
             raise CellError('Duplicated LATTICE_* block in .cell file')
         abc_block = stripped.freeform_block("lattice_abc")
-        l_split = l.lower().strip().split()
-        if l_split[0] in length_units:
-            u = length_units[l_split[0]]
-        else:
-            try:
-                hkl_data.append([u*float(x) for x in l_split])
-            except ValueError:
-                raise CellError('Bad formatting in .cell file LATTICE_ABC block')
-            if (len(hkl_data) == 1):
-                abc = tuple(hkl_data[0])
-            if (len(hkl_data) >= 2):
-                raise CellError('Bad formatting in .cell file LATTICE_ABC block')
+        for l in abc_block:
+            l_split = l.lower().strip().split()
+            if l_split[0] in length_units:
+                u = length_units[l_split[0]]
+            else:
+                try:
+                    hkl_data.append([u*float(x) for x in l_split])
+                except ValueError:
+                    raise CellError('Bad formatting in .cell file LATTICE_ABC block')
+                if (len(hkl_data) == 1):
+                    abc = tuple(hkl_data[0])
+                if (len(hkl_data) > 2):
+                    raise CellError('Bad formatting in .cell file LATTICE_ABC block')
 
     if abc is None:
         raise CellError('.cell file does not contain a LATTICE_* block')

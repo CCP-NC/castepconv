@@ -59,6 +59,10 @@ class PotError(Exception):
     def __str__(self):
         return self.value
 
+# Util: ANSI colored WARNING text
+
+__WARNING__ = '\033[93mWARNING\033[0m'
+
 # Length units allowed by CASTEP. Internally used unit is always Angstroms
 
 length_units = {'ang':1.0, 'm':1.0e10, 'cm':1.0e8, 'nm':10.0, 'bohr':0.529, 'a0':0.529}
@@ -216,9 +220,9 @@ def parse_convfile(cfile):
     clines = cfile.readlines()
 
     for i, l in enumerate(clines):
-        #Skip comments
-        if (l[0] == '#'):
-            continue
+        # Skip comments
+        if ('#' in l):
+            l = l[:l.index('#')]
 
         #Parse options
         cline = l.strip()
@@ -233,6 +237,11 @@ def parse_convfile(cfile):
         if (par_name in str_par_names):
             if str_par_names[par_name] not in ('rcmd', 'subs'): # If it IS rcmd or subs, we don't need to alter it
                 cline[1] = cline[1].lower()
+            else:
+                # A basic sanity check
+                if '<seedname>' not in cline[1]:
+                    print(__WARNING__ + ": {0} does not contain a <seedname> tag.\n"
+                          "This is likely erroneous. Please check.\n".format(par_name))
             str_par_vals[str_par_names[par_name]] = cline[1].strip()
         elif (par_name in float_par_names):
             float_par_vals[float_par_names[par_name]] = float(cline[1])
@@ -242,6 +251,7 @@ def parse_convfile(cfile):
             bool_par_vals[bool_par_names[par_name]] = (cline[1].lower().strip() == "true")
         else:
             raise ConvError("Unrecognized option in .conv file at line " + str(i))
+
 
     fgmax_validate()
 
@@ -707,8 +717,8 @@ def create_conv_folder(foldname, jobname, cut, kpn, fgm, prev_jobname=None):
         print "Creating folder " + foldname
         os.makedirs(foldname)
     elif not ovwrite_files and len(os.listdir(foldname)) > 0 and prev_jobname is None:
-        to_del = raw_input("Warning: folder " + foldname + " already exists. \
-        \nSome files might be overwritten. Continue (y/N/y-all)?")
+        to_del = raw_input(__WARNING__ + ": folder " + foldname + " already exists. \n"
+                           "Some files might be overwritten. Continue (y/N/y-all)?")
         if to_del.lower() == 'y-all':
             ovwrite_files = True
         elif to_del.lower() != 'y':
@@ -817,13 +827,13 @@ def multijob_wait(running_jobs=None, wait_all=False):
                             del running_jobs[job_ind]
                     except JobError as JE:
                         del running_jobs[job_ind]
-                        print "WARNING - " + str(JE)
+                        print __WARNING__ + " - " + str(JE)
     else:
         # SERIAL operation case
         try:
             jobfinish_wait(foldname, jobname)
         except JobError as JE:
-            print "WARNING - " + str(JE)
+            print __WARNING__ + " - " + str(JE)
 
 # Find and if needed copy the pseudo potential files
 
@@ -862,8 +872,8 @@ def find_pseudopots(seedname, pseudo_pots):
                 if not os.path.exists(pp_folder):
                     os.makedirs(pp_folder)
                 elif not ovwrite_files:
-                    to_del = raw_input("Warning: folder " + pp_folder + " already exists. \
-                    \nSome files might be overwritten. Continue (y/N/y-all)?")
+                    to_del = raw_input(__WARNING__ + ": folder " + pp_folder + " already exists.\n"
+                                       "Some files might be overwritten. Continue (y/N/y-all)?")
                     if to_del.lower() == 'y-all':
                         ovwrite_files = True
                     elif to_del.lower() != 'y':
@@ -958,7 +968,7 @@ print "Reading " + seedname + ".conv"
 try:
     job_convfile = open(seedname + ".conv", 'r')
 except IOError:
-    print "WARNING - Convergence parameter file for job " + seedname + " not found. Using default parameters"
+    print __WARNING__ + ": - Convergence parameter file for job " + seedname + " not found. Using default parameters"
     job_convfile = None
 
 if job_convfile is not None:
@@ -988,7 +998,7 @@ else:
 try:
     stripped_param = strip_paramfile(seedname + ".param")
 except io_freeform_error:
-    print("WARNING - .param file for job " + seedname + " not found")
+    print(__WARNING__ + " - .param file for job " + seedname + " not found")
     stripped_param = io_freeform_file()
 
 # Override task in .conv file with command line options
@@ -1076,7 +1086,7 @@ if (str_par_vals['ctsk'] in ("input", "inputrun", "all")):
     if str_par_vals["subs"] is not None:
 
         if not os.path.isfile(str_par_vals["subs"]):
-            print "WARNING: submission script " + str_par_vals["subs"] + " not found, skipping"
+            print __WARNING__ + ": submission script " + str_par_vals["subs"] + " not found, skipping"
         else:
             sscript = open(str_par_vals["subs"], 'r').readlines()
 
@@ -1102,7 +1112,7 @@ if (str_par_vals['ctsk'] in ("input", "inputrun", "all")):
     # Open a .conv_tab file to keep track of the created files and folders. Will be read if output is done as a separate operation
 
     if os.path.isfile(seedname + ".conv_tab") and not ovwrite_files:
-        to_del = raw_input("Warning: " + seedname + ".conv_tab already exists. This file will be overwritten. Continue (y/N/y-all)?")
+        to_del = raw_input(__WARNING__ + ": " + seedname + ".conv_tab already exists. This file will be overwritten. Continue (y/N/y-all)?")
         if to_del.lower() == 'y-all':
             ovwrite_files = True
         elif to_del.lower() != 'y':
@@ -1169,8 +1179,8 @@ if (str_par_vals['ctsk'] in ("input", "inputrun", "all")):
         if not os.path.exists(foldname):
             os.makedirs(foldname)
         elif not ovwrite_files:
-            to_del = raw_input("Warning: folder " + foldname + " already exists. \
-            \nSome files might be overwritten. Continue (y/N/y-all)?")
+            to_del = raw_input(__WARNING__ + ": folder " + foldname + " already exists. "
+                               "\nSome files might be overwritten. Continue (y/N/y-all)?")
             if to_del.lower() == 'y-all':
                 ovwrite_files = True
             elif to_del.lower() != 'y':
@@ -1330,7 +1340,7 @@ if (str_par_vals["ctsk"] in ("all", "output")):
             if scan in ('fgm', 'kpn'):
                 sys.exit("ERROR - Simulation parameters in " + filepath + " do not correspond to expected values")
             else:
-                print "WARNING - fine_Gmax value used in " + filepath + " is greater than the set value of fine_gmax_min due to the higher cutoff"
+                print __WARNING__ + " - fine_Gmax value used in " + filepath + " is greater than the set value of fine_gmax_min due to the higher cutoff"
 
         if castep_data['nrg'] is None or castep_data['for'] is None:
             sys.exit("ERROR - Incomplete simulation results in " + filepath + " (missing energy or forces)")

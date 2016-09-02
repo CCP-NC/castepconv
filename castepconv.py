@@ -239,9 +239,9 @@ def parse_convfile(cfile):
                 cline[1] = cline[1].lower()
             else:
                 # A basic sanity check
-                if '<seedname>' not in cline[1]:
-                    print(__WARNING__ + ": {0} does not contain a <seedname> tag.\n"
-                          "This is likely erroneous. Please check.\n".format(par_name))
+                if str_par_names[par_name] == 'rcmd' and '<seedname>' not in cline[1]:
+                    print(__WARNING__ + ": running_command does not contain a <seedname> tag.\n"
+                          "This is likely erroneous. Please check.\n")
             str_par_vals[str_par_names[par_name]] = cline[1].strip()
         elif (par_name in float_par_names):
             float_par_vals[float_par_names[par_name]] = float(cline[1])
@@ -1089,6 +1089,11 @@ if (str_par_vals['ctsk'] in ("input", "inputrun", "all")):
             print __WARNING__ + ": submission script " + str_par_vals["subs"] + " not found, skipping"
         else:
             sscript = open(str_par_vals["subs"], 'r').readlines()
+            # Sanity check
+            has_seed = any(['<seedname>' in l for l in sscript])
+            if not has_seed:
+                print(__WARNING__ + ": submission script does not contain a <seedname> tag.\n"
+                      "This is likely erroneous. Please check.\n")
 
     # Apply displacements to .cell atoms if needed to have non-zero forces
 

@@ -12,7 +12,7 @@ import subprocess as sp
 from cconv.graphs import gp_graph, agr_graph
 from cconv.io_freeform import io_freeform_file, io_freeform_error
 
-__vers_number__ = "0.9.6"
+__vers_number__ = "1.0.2"
 
 # Try importing argparse - if the Python version is too old, use optparse
 
@@ -176,12 +176,11 @@ __CASTEP_KPOINTS__      = "MP grid size for SCF calculation is"
 __CASTEP_FINEGMAX__     = "size of   fine   gmax                          :"
 __CASTEP_ENERGY__       = "Final energy, E             ="
 __CASTEP_ENERGY_FIX__   = "Final energy ="
-__CASTEP_FORCES__       = "***************** Symmetrised Forces *****************"
-__CASTEP_FORCES_ALT__   = "*********************** Forces ***********************"
-__CASTEP_FORCES_END__   = "*                                                    *"
-__CASTEP_STRESSES__     = "*********** Symmetrised Stress Tensor ***********"
-__CASTEP_STRESSES_ALT__ = "***************** Stress Tensor *****************"
-__CASTEP_STRESSES_END__ = "*                                               *"
+
+_CASTEP_FORCERE = re.compile('[\*]+ [a-zA-Z\s]+ Forces [\*]+')
+_CASTEP_FORCEENDRE = re.compile('\*[\s]+\*')
+_CASTEP_STRESSRE = re.compile('[\*]+ [a-zA-Z\s]+ Stress Tensor [\*]+')
+_CASTEP_STRESSENDRE = _CASTEP_FORCEENDRE
 
 # Just a useful snippet to return a kpoint grid from a 3-ple
 
@@ -473,13 +472,13 @@ def jobfinish_check(foldname, jobname):
 
 def parse_forces(cfile):
 
-    global __CASTEP_FORCES_END__
+    global _CASTEP_FORCEENDRE
 
     max_for = 0.0
 
     for l in cfile[6:]:
 
-        if __CASTEP_FORCES_END__ in l:
+        if _CASTEP_FORCEENDRE.findall(l) != []:
             return max_for
 
         try:
@@ -495,13 +494,13 @@ def parse_forces(cfile):
 
 def parse_stresses(cfile):
 
-    global __CASTEP_STRESSES_END__
+    global _CASTEP_STRESSENDRE
 
     max_stress = 0.0
 
     for l in cfile[6:]:
 
-        if __CASTEP_STRESSES_END__ in l:
+        if _CASTEP_STRESSENDRE.findall(l) != []:
             return max_stress
 
         try:
@@ -519,9 +518,9 @@ def parse_stresses(cfile):
 def parse_castep_file(cfile, filepath):
 
     global bool_par_vals, has_fix_occ
-    global __CASTEP_ATOMN__, __CASTEP_CUTOFF__, __CASTEP_ENERGY_FIX__, __CASTEP_ENERGY__, __CASTEP_FINEGMAX__, __CASTEP_FORCES_ALT__
-    global __CASTEP_FORCES_END__, __CASTEP_FORCES__, __CASTEP_HEADER__, __CASTEP_KPOINTS__, __CASTEP_STRESSES_ALT__
-    global __CASTEP_STRESSES_ALT__, __CASTEP_STRESSES_END__, __CASTEP_STRESSES__
+    global __CASTEP_ATOMN__, __CASTEP_CUTOFF__, __CASTEP_ENERGY_FIX__, __CASTEP_ENERGY__, __CASTEP_FINEGMAX__
+    global __CASTEP_HEADER__, __CASTEP_KPOINTS__
+    global _CASTEP_FORCERE, _CASTEP_STRESSRE
 
     atom_n = None
     i_nrg = None
@@ -536,7 +535,6 @@ def parse_castep_file(cfile, filepath):
     start_l = rindex_cont(castepfile, __CASTEP_HEADER__)
 
     for i, l in enumerate(castepfile[start_l:]):
-
         try:
             if __CASTEP_ATOMN__ in l and atom_n is None:
                 atom_n = int(l.split()[7])
@@ -550,9 +548,9 @@ def parse_castep_file(cfile, filepath):
                 i_nrg = float(l.split()[4])
             elif __CASTEP_ENERGY_FIX__ in l and has_fix_occ:
                 i_nrg = float(l.split()[3])
-            elif __CASTEP_FORCES__ in l or __CASTEP_FORCES_ALT__ in l:
+            elif _CASTEP_FORCERE.findall(l) != []:
                 i_for = parse_forces(castepfile[start_l+i:])
-            elif calc_str and (__CASTEP_STRESSES__ in l or __CASTEP_STRESSES_ALT__ in l):
+            elif calc_str and _CASTEP_STRESSRE.findall(l) != []:
                 i_str = parse_stresses(castepfile[start_l+i:])
         except ValueError:
             raise CastepError("Corrupted " + filepath + " file detected")
@@ -948,503 +946,504 @@ def compile_cmd_line(jname):
     return cmd_line, stdin_file, stdout_file
 
 ###### -- MAIN PROGRAM -- ######
+if __name__ == '__main__':
 
-if (sys.version_info[0] < 2 or (sys.version_info[0] == 2 and sys.version_info[1] < 6)):
-    sys.exit("ERROR - Python version 2.6 or higher required to run the script")
+    if (sys.version_info[0] < 2 or (sys.version_info[0] == 2 and sys.version_info[1] < 6)):
+        sys.exit("ERROR - Python version 2.6 or higher required to run the script")
 
-print "CASTEPconv v. " + __vers_number__ + "\n"
-print "by Simone Sturniolo"
-print "Copyright 2014 Science and Technology Facilities Council\n"
+    print "CASTEPconv v. " + __vers_number__ + "\n"
+    print "by Simone Sturniolo"
+    print "Copyright 2014 Science and Technology Facilities Council\n"
 
-seedname, cmdline_task = parse_cmd_args()
+    seedname, cmdline_task = parse_cmd_args()
 
-if seedname is None:
-    sys.exit("ERROR - <seedname> is a required argument")
+    if seedname is None:
+        sys.exit("ERROR - <seedname> is a required argument")
 
-# PHASE 0 - Check for existence of all required files and read the necessary information
+    # PHASE 0 - Check for existence of all required files and read the necessary information
 
-print "Reading " + seedname + ".conv"
-
-try:
-    job_convfile = open(seedname + ".conv", 'r')
-except IOError:
-    print __WARNING__ + ": - Convergence parameter file for job " + seedname + " not found. Using default parameters"
-    job_convfile = None
-
-if job_convfile is not None:
-    try:
-        parse_convfile(job_convfile)
-    except ConvError as CE:
-        sys.exit("ERROR - " + str(CE))
-
-#    CELL and PARAM files need to be opened only if the task is not OUTPUT
-
-if (str_par_vals['ctsk'] != "output"):
-
-    print "Reading " + seedname + ".cell"
+    print "Reading " + seedname + ".conv"
 
     try:
-        assert os.path.isfile(seedname + ".cell")
-    except AssertionError:
-        sys.exit("ERROR - .cell file for job " + seedname + " not found")
+        job_convfile = open(seedname + ".conv", 'r')
+    except IOError:
+        print __WARNING__ + ": - Convergence parameter file for job " + seedname + " not found. Using default parameters"
+        job_convfile = None
 
-    print "Reading " + seedname + ".param"
-
-else:
-    cellfile_lines = None
-
-# This is needed even for output tasks since the program needs to be aware whether fix_occupancy is used
-
-try:
-    stripped_param = strip_paramfile(seedname + ".param")
-except io_freeform_error:
-    print(__WARNING__ + " - .param file for job " + seedname + " not found")
-    stripped_param = io_freeform_file()
-
-# Override task in .conv file with command line options
-
-if cmdline_task is not None:
-    str_par_vals['ctsk'] = {'c': 'clear', 'i': 'input', 'ir': 'inputrun', 'o': 'output', 'a': 'all'}[cmdline_task]
-
-try:
-    assert(str_par_vals['ctsk'] in ("clear", "input", "inputrun", "output", "all"))
-except AssertionError as e:
-    sys.exit("ERROR - Invalid convergence_task parameter")
-
-# PHASE 0.5 - CLEAR
-# Clear all files and folders from previous jobs
-
-if (str_par_vals['ctsk'] in ("clear")):
-
-    # Create a list of files and folders to delete
-    
-    to_del_fold = set(glob.glob(seedname + "_cut_*_kpn_*_fgm_*"))
-    to_del_fold = to_del_fold.union(set(glob.glob(seedname + "_cut_*_kpn_*")))
-    
-    if os.path.exists(seedname + "_conv"):
-        to_del_fold.add(seedname + "_conv")
-    if os.path.exists(seedname + "_pspot"):
-        to_del_fold.add(seedname + "_pspot")
-
-    # Create a list of files to delete
-    to_del_suffixes = [".conv_tab", "_report.txt",
-        "_cut_conv.dat", "_kpn_conv.dat", "_fgm_conv.dat",
-        "_cut_conv.gp",  "_kpn_conv.gp", "_fgm_conv.gp",   "_cut_str_conv.gp",  "_kpn_str_conv.gp",  "_fgm_str_conv.gp",
-        "_cut_conv.agr", "_kpn_conv.agr", "_fgm_conv.agr", "_cut_str_conv.agr", "_kpn_str_conv.agr", "_fgm_str_conv.agr"]   # A list of all possible files to delete
-
-    to_del_files = []
-
-    for suff in to_del_suffixes:
-        if os.path.isfile(seedname + suff):
-            to_del_files += [seedname + suff]
-
-    if (len(to_del_fold) > 0):
-        print "The following folders will be deleted:"
-        for f in to_del_fold:
-            sys.stdout.write(f + ' ')
-        print ""
-
-    if (len(to_del_files) > 0):
-        print "The following files will be deleted:"
-        for f in to_del_files:
-            sys.stdout.write(f + ' ')
-        print ""
-
-    if ((len(to_del_fold) + len(to_del_files)) == 0):
-        print "No folders or files to delete found"
-    else:
-        to_del = raw_input("Continue (y/N)?")
-    
-        if to_del.lower() == 'y':
-    
-            for f in to_del_fold:
-                shutil.rmtree(f)
-            for f in to_del_files:
-                os.remove(f)
-
-# PHASE 1 - INPUT
-# Produce a batch of folders and files with the various configurations
-
-if (str_par_vals['ctsk'] in ("input", "inputrun", "all")):
-
-    # First create a "stripped" version of cell and param files, to use as a template for the new files to generate
-
-    try:
-        stripped_cell, abc_len, kpn_base, pseudo_pots = strip_cellfile(seedname + ".cell")
-    except CellError as CE:
-        sys.exit("ERROR - " + str(CE))
-
-    # Check the positions and existence of pseudopotentials
-
-    try:
-        find_pseudopots(seedname, pseudo_pots)
-    except PotError as PE:
-        sys.exit("ERROR - " + str(PE))
-
-    # Check the existence of any eventual submission scripts
-
-    if str_par_vals["subs"] is not None:
-
-        if not os.path.isfile(str_par_vals["subs"]):
-            print __WARNING__ + ": submission script " + str_par_vals["subs"] + " not found, skipping"
-        else:
-            sscript = open(str_par_vals["subs"], 'r').readlines()
-            # Sanity check
-            has_seed = any(['<seedname>' in l for l in sscript])
-            if not has_seed:
-                print(__WARNING__ + ": submission script does not contain a <seedname> tag.\n"
-                      "This is likely erroneous. Please check.\n")
-
-    # Apply displacements to .cell atoms if needed to have non-zero forces
-
-    if float_par_vals["displ"] > 0.0:
-        print "Displacing atoms in .cell file of " + str(float_par_vals["displ"]) + " Angstroms"
+    if job_convfile is not None:
         try:
-            stripped_cell = displace_cell_atoms(stripped_cell, abc_len, float_par_vals["displ"])
+            parse_convfile(job_convfile)
+        except ConvError as CE:
+            sys.exit("ERROR - " + str(CE))
+
+    #    CELL and PARAM files need to be opened only if the task is not OUTPUT
+
+    if (str_par_vals['ctsk'] != "output"):
+
+        print "Reading " + seedname + ".cell"
+
+        try:
+            assert os.path.isfile(seedname + ".cell")
+        except AssertionError:
+            sys.exit("ERROR - .cell file for job " + seedname + " not found")
+
+        print "Reading " + seedname + ".param"
+
+    else:
+        cellfile_lines = None
+
+    # This is needed even for output tasks since the program needs to be aware whether fix_occupancy is used
+
+    try:
+        stripped_param = strip_paramfile(seedname + ".param")
+    except io_freeform_error:
+        print(__WARNING__ + " - .param file for job " + seedname + " not found")
+        stripped_param = io_freeform_file()
+
+    # Override task in .conv file with command line options
+
+    if cmdline_task is not None:
+        str_par_vals['ctsk'] = {'c': 'clear', 'i': 'input', 'ir': 'inputrun', 'o': 'output', 'a': 'all'}[cmdline_task]
+
+    try:
+        assert(str_par_vals['ctsk'] in ("clear", "input", "inputrun", "output", "all"))
+    except AssertionError as e:
+        sys.exit("ERROR - Invalid convergence_task parameter")
+
+    # PHASE 0.5 - CLEAR
+    # Clear all files and folders from previous jobs
+
+    if (str_par_vals['ctsk'] in ("clear")):
+
+        # Create a list of files and folders to delete
+        
+        to_del_fold = set(glob.glob(seedname + "_cut_*_kpn_*_fgm_*"))
+        to_del_fold = to_del_fold.union(set(glob.glob(seedname + "_cut_*_kpn_*")))
+        
+        if os.path.exists(seedname + "_conv"):
+            to_del_fold.add(seedname + "_conv")
+        if os.path.exists(seedname + "_pspot"):
+            to_del_fold.add(seedname + "_pspot")
+
+        # Create a list of files to delete
+        to_del_suffixes = [".conv_tab", "_report.txt",
+            "_cut_conv.dat", "_kpn_conv.dat", "_fgm_conv.dat",
+            "_cut_conv.gp",  "_kpn_conv.gp", "_fgm_conv.gp",   "_cut_str_conv.gp",  "_kpn_str_conv.gp",  "_fgm_str_conv.gp",
+            "_cut_conv.agr", "_kpn_conv.agr", "_fgm_conv.agr", "_cut_str_conv.agr", "_kpn_str_conv.agr", "_fgm_str_conv.agr"]   # A list of all possible files to delete
+
+        to_del_files = []
+
+        for suff in to_del_suffixes:
+            if os.path.isfile(seedname + suff):
+                to_del_files += [seedname + suff]
+
+        if (len(to_del_fold) > 0):
+            print "The following folders will be deleted:"
+            for f in to_del_fold:
+                sys.stdout.write(f + ' ')
+            print ""
+
+        if (len(to_del_files) > 0):
+            print "The following files will be deleted:"
+            for f in to_del_files:
+                sys.stdout.write(f + ' ')
+            print ""
+
+        if ((len(to_del_fold) + len(to_del_files)) == 0):
+            print "No folders or files to delete found"
+        else:
+            to_del = raw_input("Continue (y/N)?")
+        
+            if to_del.lower() == 'y':
+        
+                for f in to_del_fold:
+                    shutil.rmtree(f)
+                for f in to_del_files:
+                    os.remove(f)
+
+    # PHASE 1 - INPUT
+    # Produce a batch of folders and files with the various configurations
+
+    if (str_par_vals['ctsk'] in ("input", "inputrun", "all")):
+
+        # First create a "stripped" version of cell and param files, to use as a template for the new files to generate
+
+        try:
+            stripped_cell, abc_len, kpn_base, pseudo_pots = strip_cellfile(seedname + ".cell")
         except CellError as CE:
             sys.exit("ERROR - " + str(CE))
 
-    # If reuse of previous calculations is required, try to open the old .conv_tab file
+        # Check the positions and existence of pseudopotentials
 
-    if bool_par_vals["rcalc"] and os.path.isfile(seedname + ".conv_tab"):
-        print "Reusing results from previous convergence calculations"
-        old_cutrange, old_kpnrange, old_fgmrange = parse_conv_tab_file(open(seedname + ".conv_tab", 'r'))
-    else:
-        old_cutrange = []
-        old_kpnrange = []
-        old_fgmrange = []
+        try:
+            find_pseudopots(seedname, pseudo_pots)
+        except PotError as PE:
+            sys.exit("ERROR - " + str(PE))
 
-    # Open a .conv_tab file to keep track of the created files and folders. Will be read if output is done as a separate operation
+        # Check the existence of any eventual submission scripts
 
-    if os.path.isfile(seedname + ".conv_tab") and not ovwrite_files:
-        to_del = raw_input(__WARNING__ + ": " + seedname + ".conv_tab already exists. This file will be overwritten. Continue (y/N/y-all)?")
-        if to_del.lower() == 'y-all':
-            ovwrite_files = True
-        elif to_del.lower() != 'y':
-            sys.exit("Aborting")
+        if str_par_vals["subs"] is not None:
 
-    conv_tab_file = open(seedname + ".conv_tab", 'w')
+            if not os.path.isfile(str_par_vals["subs"]):
+                print __WARNING__ + ": submission script " + str_par_vals["subs"] + " not found, skipping"
+            else:
+                sscript = open(str_par_vals["subs"], 'r').readlines()
+                # Sanity check
+                has_seed = any(['<seedname>' in l for l in sscript])
+                if not has_seed:
+                    print(__WARNING__ + ": submission script does not contain a <seedname> tag.\n"
+                          "This is likely erroneous. Please check.\n")
 
-    if (float_par_vals["cutmin"] <= 0.0 or float_par_vals["cutstep"] <= 0.0 or float_par_vals["cutmax"] < float_par_vals["cutmin"]):
-        sys.exit("ERROR - Invalid cutoff range defined in .conv file")
-    if (int_par_vals["kpnmin"] <= 0 or int_par_vals["kpnstep"] <= 0 or int_par_vals["kpnmax"] < int_par_vals["kpnmin"]):
-        sys.exit("ERROR - Invalid k-points range defined in .conv file")
+        # Apply displacements to .cell atoms if needed to have non-zero forces
 
-    cut_n = int(math.ceil(float_par_vals["cutmax"]-float_par_vals["cutmin"])/float_par_vals["cutstep"])+1
-    cutrange = [float_par_vals["cutmin"] + i * float_par_vals["cutstep"] for i in range(0, cut_n)]
+        if float_par_vals["displ"] > 0.0:
+            print "Displacing atoms in .cell file of " + str(float_par_vals["displ"]) + " Angstroms"
+            try:
+                stripped_cell = displace_cell_atoms(stripped_cell, abc_len, float_par_vals["displ"])
+            except CellError as CE:
+                sys.exit("ERROR - " + str(CE))
 
-    kpn_n = int(math.ceil(int_par_vals["kpnmax"]-int_par_vals["kpnmin"])/int_par_vals["kpnstep"])+1
-    kpnrange = [tuple([int((int_par_vals["kpnmin"] + i * int_par_vals["kpnstep"]) * e) for e in kpn_base]) for i in range(0, kpn_n)]
+        # If reuse of previous calculations is required, try to open the old .conv_tab file
 
-    if (str_par_vals["fgmmode"] is not None):
-        fgm_n = int(math.ceil(float_par_vals["fgmmax"]-float_par_vals["fgmmin"])/float_par_vals["fgmstep"])+1
-        fgmrange = [float_par_vals["fgmmin"] + i * float_par_vals["fgmstep"] for i in range(0, fgm_n)]
-    else:
-        fgmrange = [None]
-    
-    # Build an array with the simulation conditions to employ condensed into one
+        if bool_par_vals["rcalc"] and os.path.isfile(seedname + ".conv_tab"):
+            print "Reusing results from previous convergence calculations"
+            old_cutrange, old_kpnrange, old_fgmrange = parse_conv_tab_file(open(seedname + ".conv_tab", 'r'))
+        else:
+            old_cutrange = []
+            old_kpnrange = []
+            old_fgmrange = []
 
-    allrange = []
-    fgm_cutoff = cutrange[-1] if str_par_vals['fgmmode'] == 'max_cutoff' else cutrange[0]
-    conv_tab_file.write("cutoff:\t")
-    for cut in cutrange:
-        conv_tab_file.write(str(cut) + " eV\t")
-        allrange.append({'cut': cut, 'kpn': kpnrange[0], 'fgm': fgmrange[0], 'scan': 'cut'})
-    conv_tab_file.write("\nkpoint_n:\t" + kgrid(kpnrange[0]) + "\t|\t")
-    for kpn in kpnrange[1:]:
-        conv_tab_file.write(kgrid(kpn) + "\t|\t")
-        allrange.append({'cut': cutrange[0], 'kpn': kpn, 'fgm': fgmrange[0], 'scan': 'kpn'})
-    conv_tab_file.write("\nfine_gmax:\t" + (str(fgmrange[0]) + " eV\t" if fgmrange[0] is not None else "N/A"))
-    for fgm in fgmrange[1:]:
-        conv_tab_file.write(str(fgm) + " eV\t")
-        allrange.append({'cut': fgm_cutoff, 'kpn': kpnrange[0], 'fgm': fgm, 'scan': 'fgm'})
-    conv_tab_file.close()
+        # Open a .conv_tab file to keep track of the created files and folders. Will be read if output is done as a separate operation
 
-    foldname = None
-    jobname = None
-    prev_jobname = None
-
-    try:
-        assert(str_par_vals["rmode"] in ("serial", "parallel"))
-    except AssertionError as e:
-        sys.exit("ERROR - Invalid value for the running_mode parameter")
-
-    if str_par_vals["rmode"] == "parallel":
-
-        print "Creating folders for parallel convergence run"
-
-    elif str_par_vals["rmode"] == "serial":
-
-        foldname = seedname + "_conv"
-
-        print "Creating folder " + foldname + " for serial convergence run"
-
-        # Check whether the folder exists from previous jobs or you're just creating it now...
-
-        if not os.path.exists(foldname):
-            os.makedirs(foldname)
-        elif not ovwrite_files:
-            to_del = raw_input(__WARNING__ + ": folder " + foldname + " already exists. "
-                               "\nSome files might be overwritten. Continue (y/N/y-all)?")
+        if os.path.isfile(seedname + ".conv_tab") and not ovwrite_files:
+            to_del = raw_input(__WARNING__ + ": " + seedname + ".conv_tab already exists. This file will be overwritten. Continue (y/N/y-all)?")
             if to_del.lower() == 'y-all':
                 ovwrite_files = True
             elif to_del.lower() != 'y':
                 sys.exit("Aborting")
 
-    for pars in allrange:
+        conv_tab_file = open(seedname + ".conv_tab", 'w')
 
-        cut = pars['cut']
-        kpn = pars['kpn']
-        fgm = pars['fgm']
+        if (float_par_vals["cutmin"] <= 0.0 or float_par_vals["cutstep"] <= 0.0 or float_par_vals["cutmax"] < float_par_vals["cutmin"]):
+            sys.exit("ERROR - Invalid cutoff range defined in .conv file")
+        if (int_par_vals["kpnmin"] <= 0 or int_par_vals["kpnstep"] <= 0 or int_par_vals["kpnmax"] < int_par_vals["kpnmin"]):
+            sys.exit("ERROR - Invalid k-points range defined in .conv file")
 
-        jobname = jname(seedname, cut, kpn, fgm)
+        cut_n = int(math.ceil(float_par_vals["cutmax"]-float_par_vals["cutmin"])/float_par_vals["cutstep"])+1
+        cutrange = [float_par_vals["cutmin"] + i * float_par_vals["cutstep"] for i in range(0, cut_n)]
 
-        if str_par_vals["rmode"] == "parallel":
-            foldname = jobname
+        kpn_n = int(math.ceil(int_par_vals["kpnmax"]-int_par_vals["kpnmin"])/int_par_vals["kpnstep"])+1
+        kpnrange = [tuple([int((int_par_vals["kpnmin"] + i * int_par_vals["kpnstep"]) * e) for e in kpn_base]) for i in range(0, kpn_n)]
 
-        # If we're reusing data, skip recreating the folder only if we already have some results
-
-        if bool_par_vals["rcalc"]:
-            try:
-                if jobfinish_check(foldname, jobname):
-                    continue
-            except JobError:
-                pass
-
-        create_conv_folder(foldname, jobname, cut, kpn, fgm, prev_jobname)
-
-        if str_par_vals["rmode"] == "serial":
-            prev_jobname = jobname
-
-
-# PHASE 2 - EXECUTION
-# Run through the files and obtain the results
-
-if (str_par_vals["ctsk"] in ("all", "inputrun")):
-
-    if str_par_vals["rmode"] == "parallel":
-
-        print "Running parallel convergence jobs"
-
-        running_jobs = []
-
-    elif str_par_vals["rmode"] == "serial":
-
-        print "Running serial convergence jobs"
-
-        running_jobs = None
-
-        foldname = seedname + "_conv"
-
-    else:
-        sys.exit("ERROR - Invalid value for the running_mode parameter")
-
-    for i, pars in enumerate(allrange):
-
-        cut = pars['cut']
-        kpn = pars['kpn']
-        fgm = pars['fgm']
-
-        jobname = jname(seedname, cut, kpn, fgm)
-        if str_par_vals["rmode"] == "parallel":
-            foldname = jobname
-
-        job_run(foldname, jobname, running_jobs)
-        # Wait for everyone to finish
-        multijob_wait(running_jobs, wait_all=(i==(len(allrange)-1)))
-
-    if (str_par_vals["ctsk"] == "all"):
-        print "\n -- All jobs finished. Proceeding to analyze output --\n"
-
-# PHASE 3 - OUTPUT PARSING
-# Here is where we parse the .CASTEP files and draw our conclusions
-
-if (str_par_vals["ctsk"] in ("all", "output")):
-
-    # If this is an output job, try opening a .conv_tab file and rebuild cutrange and kpnrange from that - otherwise just use the parameters from the .conv file
-
-    if (cutrange is None or kpnrange is None or fgmrange is None):
-        if os.path.isfile(seedname + ".conv_tab"):
-            cutrange, kpnrange, fgmrange = parse_conv_tab_file(open(seedname + ".conv_tab", 'r'))
+        if (str_par_vals["fgmmode"] is not None):
+            fgm_n = int(math.ceil(float_par_vals["fgmmax"]-float_par_vals["fgmmin"])/float_par_vals["fgmstep"])+1
+            fgmrange = [float_par_vals["fgmmin"] + i * float_par_vals["fgmstep"] for i in range(0, fgm_n)]
         else:
-            cut_n = int(math.ceil(float_par_vals["cutmax"]-float_par_vals["cutmin"])/float_par_vals["cutstep"])+1
-            cutrange = [float_par_vals["cutmin"] + i * float_par_vals["cutstep"] for i in range(0, cut_n)]
-    
-            kpn_n = int(math.ceil(int_par_vals["kpnmax"]-int_par_vals["kpnmin"])/int_par_vals["kpnstep"])+1
-            kpnrange = [tuple([int((int_par_vals["kpnmin"] + i * int_par_vals["kpnstep"]) * e) for e in kpn_base]) for i in range(0, kpn_n)]
-    
-            if (str_par_vals["fgmmode"] is not None):
-                fgm_n = int(math.ceil(float_par_vals["fgmmax"]-float_par_vals["fgmmin"])/float_par_vals["fgmstep"])+1
-                fgmrange = [float_par_vals["fgmmin"] + i * float_par_vals["fgmstep"] for i in range(0, fgm_n)]
-            else:
-                fgmrange = [None]
+            fgmrange = [None]
+        
+        # Build an array with the simulation conditions to employ condensed into one
 
-    if (len(cutrange) + len(kpnrange) + len(fgmrange) == 0):
-        sys.exit("ERROR - Corrupted .conv_tab file. Output task can not be carried out")
-    
-    calc_str = bool_par_vals["cnvstr"]
-    conv_fgm = (str_par_vals["fgmmode"] is not None)
-
-    if (allrange is None):
-        fgm_cutoff = cutrange[-1] if str_par_vals['fgmmode'] == 'max_cutoff' else cutrange[0]
         allrange = []
+        fgm_cutoff = cutrange[-1] if str_par_vals['fgmmode'] == 'max_cutoff' else cutrange[0]
+        conv_tab_file.write("cutoff:\t")
         for cut in cutrange:
+            conv_tab_file.write(str(cut) + " eV\t")
             allrange.append({'cut': cut, 'kpn': kpnrange[0], 'fgm': fgmrange[0], 'scan': 'cut'})
+        conv_tab_file.write("\nkpoint_n:\t" + kgrid(kpnrange[0]) + "\t|\t")
         for kpn in kpnrange[1:]:
+            conv_tab_file.write(kgrid(kpn) + "\t|\t")
             allrange.append({'cut': cutrange[0], 'kpn': kpn, 'fgm': fgmrange[0], 'scan': 'kpn'})
+        conv_tab_file.write("\nfine_gmax:\t" + (str(fgmrange[0]) + " eV\t" if fgmrange[0] is not None else "N/A"))
         for fgm in fgmrange[1:]:
+            conv_tab_file.write(str(fgm) + " eV\t")
             allrange.append({'cut': fgm_cutoff, 'kpn': kpnrange[0], 'fgm': fgm, 'scan': 'fgm'})
+        conv_tab_file.close()
 
-    cutnrg = []
-    cutfor = []
-    cutstr = []
-    kpnnrg = []
-    kpnfor = []
-    kpnstr = []
-    fgmnrg = []
-    fgmfor = []
-    fgmstr = []
+        foldname = None
+        jobname = None
+        prev_jobname = None
 
-    # Try opening the various .castep files and collect energy and forces
+        try:
+            assert(str_par_vals["rmode"] in ("serial", "parallel"))
+        except AssertionError as e:
+            sys.exit("ERROR - Invalid value for the running_mode parameter")
 
-    for pars in allrange:
+        if str_par_vals["rmode"] == "parallel":
 
-        cut = pars['cut']
-        kpn = pars['kpn']
-        fgm = pars['fgm']
+            print "Creating folders for parallel convergence run"
 
-        scan = pars['scan']
+        elif str_par_vals["rmode"] == "serial":
 
-        jobname = jname(seedname, cut, kpn, fgm)
-
-        if (str_par_vals["rmode"] == "serial"):
             foldname = seedname + "_conv"
-        elif (str_par_vals["rmode"] == "parallel"):
-            foldname = jobname
+
+            print "Creating folder " + foldname + " for serial convergence run"
+
+            # Check whether the folder exists from previous jobs or you're just creating it now...
+
+            if not os.path.exists(foldname):
+                os.makedirs(foldname)
+            elif not ovwrite_files:
+                to_del = raw_input(__WARNING__ + ": folder " + foldname + " already exists. "
+                                   "\nSome files might be overwritten. Continue (y/N/y-all)?")
+                if to_del.lower() == 'y-all':
+                    ovwrite_files = True
+                elif to_del.lower() != 'y':
+                    sys.exit("Aborting")
+
+        for pars in allrange:
+
+            cut = pars['cut']
+            kpn = pars['kpn']
+            fgm = pars['fgm']
+
+            jobname = jname(seedname, cut, kpn, fgm)
+
+            if str_par_vals["rmode"] == "parallel":
+                foldname = jobname
+
+            # If we're reusing data, skip recreating the folder only if we already have some results
+
+            if bool_par_vals["rcalc"]:
+                try:
+                    if jobfinish_check(foldname, jobname):
+                        continue
+                except JobError:
+                    pass
+
+            create_conv_folder(foldname, jobname, cut, kpn, fgm, prev_jobname)
+
+            if str_par_vals["rmode"] == "serial":
+                prev_jobname = jobname
+
+
+    # PHASE 2 - EXECUTION
+    # Run through the files and obtain the results
+
+    if (str_par_vals["ctsk"] in ("all", "inputrun")):
+
+        if str_par_vals["rmode"] == "parallel":
+
+            print "Running parallel convergence jobs"
+
+            running_jobs = []
+
+        elif str_par_vals["rmode"] == "serial":
+
+            print "Running serial convergence jobs"
+
+            running_jobs = None
+
+            foldname = seedname + "_conv"
+
         else:
             sys.exit("ERROR - Invalid value for the running_mode parameter")
 
-        filepath = os.path.join(foldname, jobname + '.castep')
+        for i, pars in enumerate(allrange):
 
-        if not os.path.isfile(filepath):
-            sys.exit("ERROR - File " + filepath + " not found. Please check the .conv file and that all calculations have actually finished")
+            cut = pars['cut']
+            kpn = pars['kpn']
+            fgm = pars['fgm']
 
-        castepfile = open(filepath, 'r').readlines()
+            jobname = jname(seedname, cut, kpn, fgm)
+            if str_par_vals["rmode"] == "parallel":
+                foldname = jobname
 
-        try:
-            castep_data = parse_castep_file(castepfile, filepath)
-        except CastepError as CE:
-            sys.exit("ERROR - " + str(CE))
+            job_run(foldname, jobname, running_jobs)
+            # Wait for everyone to finish
+            multijob_wait(running_jobs, wait_all=(i==(len(allrange)-1)))
 
-        atom_n = castep_data['atom_n']
+        if (str_par_vals["ctsk"] == "all"):
+            print "\n -- All jobs finished. Proceeding to analyze output --\n"
 
-        if castep_data['cut'] is None or castep_data['kpn'] is None or castep_data['cut'] != cut or castep_data['kpn'] != kpn:
-            sys.exit("ERROR - Simulation parameters in " + filepath + " do not correspond to expected values")
+    # PHASE 3 - OUTPUT PARSING
+    # Here is where we parse the .CASTEP files and draw our conclusions
 
-        if conv_fgm and (castep_data['fgm'] is None or castep_data['fgm'] != round_digits(cut_to_k(fgm), 4)):
-            if scan in ('fgm', 'kpn'):
-                sys.exit("ERROR - Simulation parameters in " + filepath + " do not correspond to expected values")
+    if (str_par_vals["ctsk"] in ("all", "output")):
+
+        # If this is an output job, try opening a .conv_tab file and rebuild cutrange and kpnrange from that - otherwise just use the parameters from the .conv file
+
+        if (cutrange is None or kpnrange is None or fgmrange is None):
+            if os.path.isfile(seedname + ".conv_tab"):
+                cutrange, kpnrange, fgmrange = parse_conv_tab_file(open(seedname + ".conv_tab", 'r'))
             else:
-                print __WARNING__ + " - fine_Gmax value used in " + filepath + " is greater than the set value of fine_gmax_min due to the higher cutoff"
-
-        if castep_data['nrg'] is None or castep_data['for'] is None:
-            sys.exit("ERROR - Incomplete simulation results in " + filepath + " (missing energy or forces)")
-
-        if calc_str and castep_data['str'] is None:
-            sys.exit("ERROR - Incomplete simulation results in " + filepath + " (missing stresses)")
-
-        if castep_data['atom_n'] is None:
-            sys.exit("ERROR - Corrupted " + filepath + " file")
-
-        if (scan == 'cut'):
-            cutnrg.append(castep_data['nrg'])
-            cutfor.append(castep_data['for'])
-            if calc_str:
-                cutstr.append(castep_data['str'])
-        elif (scan == 'kpn'):
-            if (len(kpnnrg) == 0):
-                kpnnrg.append(cutnrg[0])
-                kpnfor.append(cutfor[0])
-                if calc_str:
-                    kpnstr.append(cutstr[0])
-            kpnnrg.append(castep_data['nrg'])
-            kpnfor.append(castep_data['for'])
-            if calc_str:
-                kpnstr.append(castep_data['str'])
-        elif (scan == 'fgm'):
-            # This could be useful if there are NO kpn points
-            if (len(kpnnrg) == 0):
-                kpnnrg.append(cutnrg[0])
-                kpnfor.append(cutfor[0])
-                if calc_str:
-                    kpnstr.append(cutstr[0])
-            if (len(fgmnrg) == 0):
-                fgmnrg.append(cutnrg[0])
-                fgmfor.append(cutfor[0])
-                if calc_str:
-                    fgmstr.append(cutstr[0])
-            fgmnrg.append(castep_data['nrg'])
-            fgmfor.append(castep_data['for'])
-            if calc_str:
-                fgmstr.append(castep_data['str'])
-
-    # Save the results in data files
-
-    cutfile = open(seedname + "_cut_conv.dat", 'w')
-    cutfile.write("Cutoff (eV)\tEnergy (eV)\tForces (eV/A)" + ("\tTotal stresses (GPa)" if calc_str else "") + "\n")
-
-    for i in range(0, len(cutrange)):
-        cutfile.write(str(cutrange[i]) + '\t\t' + str(cutnrg[i]) + '\t\t' + str(cutfor[i]) + ('\t\t' + str(cutstr[i]) if calc_str else '') + '\n')
-    
-    cutfile.close()
-
-    kpnfile = open(seedname + "_kpn_conv.dat", 'w')
-    kpnfile.write("kpoints (tot)\tEnergy (eV)\tForces (eV/A)" + ("\tTotal stresses (GPa)" if calc_str else "") + "\n")
-
-    for i in range(0, len(kpnrange)):
-        kpnfile.write(str(kpnrange[i][0]*kpnrange[i][1]*kpnrange[i][2]) + '\t\t' + str(kpnnrg[i]) + '\t\t' + str(kpnfor[i]) + ('\t\t' + str(kpnstr[i]) if calc_str else '') + '\n')
-
-    kpnfile.close()
-
-    if (conv_fgm):
-        fgmfile = open(seedname + "_fgm_conv.dat", 'w')
-        fgmfile.write("Fine Gmax (eV)\tEnergy (eV)\t\tMax force (eV/A)" + ("\tTotal stress (GPa)" if calc_str else "") + "\tFine Gmax (1/A)\n")
-    
-        for i in range(0, len(fgmrange)):
-            fgmfile.write(str(fgmrange[i]) + '\t\t' + str(fgmnrg[i]) + '\t\t' + str(fgmfor[i]) + ('\t\t' + str(fgmstr[i]) if calc_str else '') + '\t\t' + str(round_digits(cut_to_k(fgmrange[i]), 4)) + '\n')
+                cut_n = int(math.ceil(float_par_vals["cutmax"]-float_par_vals["cutmin"])/float_par_vals["cutstep"])+1
+                cutrange = [float_par_vals["cutmin"] + i * float_par_vals["cutstep"] for i in range(0, cut_n)]
         
-        fgmfile.close()
-    
-    # Make an estimate of the best values
+                kpn_n = int(math.ceil(int_par_vals["kpnmax"]-int_par_vals["kpnmin"])/int_par_vals["kpnstep"])+1
+                kpnrange = [tuple([int((int_par_vals["kpnmin"] + i * int_par_vals["kpnstep"]) * e) for e in kpn_base]) for i in range(0, kpn_n)]
+        
+                if (str_par_vals["fgmmode"] is not None):
+                    fgm_n = int(math.ceil(float_par_vals["fgmmax"]-float_par_vals["fgmmin"])/float_par_vals["fgmstep"])+1
+                    fgmrange = [float_par_vals["fgmmin"] + i * float_par_vals["fgmstep"] for i in range(0, fgm_n)]
+                else:
+                    fgmrange = [None]
 
-    conv_data = {}
-    conv_data['cut'] = {'range': cutrange,
-        'rangestr': [str(c) for c in cutrange],
-        'step': float_par_vals['cutstep'],
-        'nrg': [x/atom_n for x in cutnrg],
-        'for': cutfor}
-    conv_data['kpn'] = {'range': [k[0]*k[1]*k[2] for k in kpnrange],
-        'rangestr': [kgrid(k, 'x') for k in kpnrange],
-        'step': int_par_vals['kpnstep']*3,
-        'nrg': [x/atom_n for x in kpnnrg],
-        'for': kpnfor}
-    conv_data['fgm'] = {'range': fgmrange,
-        'rangestr': [str(f) for f in fgmrange],
-        'step': float_par_vals['fgmstep'],
-        'nrg': [x/atom_n for x in fgmnrg],
-        'for': fgmfor}
+        if (len(cutrange) + len(kpnrange) + len(fgmrange) == 0):
+            sys.exit("ERROR - Corrupted .conv_tab file. Output task can not be carried out")
+        
+        calc_str = bool_par_vals["cnvstr"]
+        conv_fgm = (str_par_vals["fgmmode"] is not None)
 
-    if bool_par_vals['cnvstr']:
-        conv_data['cut']['str'] = cutstr
-        conv_data['kpn']['str'] = kpnstr
-        conv_data['fgm']['str'] = fgmstr
+        if (allrange is None):
+            fgm_cutoff = cutrange[-1] if str_par_vals['fgmmode'] == 'max_cutoff' else cutrange[0]
+            allrange = []
+            for cut in cutrange:
+                allrange.append({'cut': cut, 'kpn': kpnrange[0], 'fgm': fgmrange[0], 'scan': 'cut'})
+            for kpn in kpnrange[1:]:
+                allrange.append({'cut': cutrange[0], 'kpn': kpn, 'fgm': fgmrange[0], 'scan': 'kpn'})
+            for fgm in fgmrange[1:]:
+                allrange.append({'cut': fgm_cutoff, 'kpn': kpnrange[0], 'fgm': fgm, 'scan': 'fgm'})
 
-    opt_estimates = conv_estimates(seedname, conv_data, calc_str)
-    
-    # Finally, let's do the plotting
+        cutnrg = []
+        cutfor = []
+        cutstr = []
+        kpnnrg = []
+        kpnfor = []
+        kpnstr = []
+        fgmnrg = []
+        fgmfor = []
+        fgmstr = []
 
-    if str_par_vals["outp"] == "gnuplot":
-        gp_graph(seedname, calc_str)
+        # Try opening the various .castep files and collect energy and forces
 
-    elif str_par_vals["outp"] in ("xmgrace", "grace"):
-        agr_graph(seedname, conv_data, calc_str)
+        for pars in allrange:
+
+            cut = pars['cut']
+            kpn = pars['kpn']
+            fgm = pars['fgm']
+
+            scan = pars['scan']
+
+            jobname = jname(seedname, cut, kpn, fgm)
+
+            if (str_par_vals["rmode"] == "serial"):
+                foldname = seedname + "_conv"
+            elif (str_par_vals["rmode"] == "parallel"):
+                foldname = jobname
+            else:
+                sys.exit("ERROR - Invalid value for the running_mode parameter")
+
+            filepath = os.path.join(foldname, jobname + '.castep')
+
+            if not os.path.isfile(filepath):
+                sys.exit("ERROR - File " + filepath + " not found. Please check the .conv file and that all calculations have actually finished")
+
+            castepfile = open(filepath, 'r').readlines()
+
+            try:
+                castep_data = parse_castep_file(castepfile, filepath)
+            except CastepError as CE:
+                sys.exit("ERROR - " + str(CE))
+
+            atom_n = castep_data['atom_n']
+
+            if castep_data['cut'] is None or castep_data['kpn'] is None or castep_data['cut'] != cut or castep_data['kpn'] != kpn:
+                sys.exit("ERROR - Simulation parameters in " + filepath + " do not correspond to expected values")
+
+            if conv_fgm and (castep_data['fgm'] is None or castep_data['fgm'] != round_digits(cut_to_k(fgm), 4)):
+                if scan in ('fgm', 'kpn'):
+                    sys.exit("ERROR - Simulation parameters in " + filepath + " do not correspond to expected values")
+                else:
+                    print __WARNING__ + " - fine_Gmax value used in " + filepath + " is greater than the set value of fine_gmax_min due to the higher cutoff"
+
+            if castep_data['nrg'] is None or castep_data['for'] is None:
+                sys.exit("ERROR - Incomplete simulation results in " + filepath + " (missing energy or forces)")
+
+            if calc_str and castep_data['str'] is None:
+                sys.exit("ERROR - Incomplete simulation results in " + filepath + " (missing stresses)")
+
+            if castep_data['atom_n'] is None:
+                sys.exit("ERROR - Corrupted " + filepath + " file")
+
+            if (scan == 'cut'):
+                cutnrg.append(castep_data['nrg'])
+                cutfor.append(castep_data['for'])
+                if calc_str:
+                    cutstr.append(castep_data['str'])
+            elif (scan == 'kpn'):
+                if (len(kpnnrg) == 0):
+                    kpnnrg.append(cutnrg[0])
+                    kpnfor.append(cutfor[0])
+                    if calc_str:
+                        kpnstr.append(cutstr[0])
+                kpnnrg.append(castep_data['nrg'])
+                kpnfor.append(castep_data['for'])
+                if calc_str:
+                    kpnstr.append(castep_data['str'])
+            elif (scan == 'fgm'):
+                # This could be useful if there are NO kpn points
+                if (len(kpnnrg) == 0):
+                    kpnnrg.append(cutnrg[0])
+                    kpnfor.append(cutfor[0])
+                    if calc_str:
+                        kpnstr.append(cutstr[0])
+                if (len(fgmnrg) == 0):
+                    fgmnrg.append(cutnrg[0])
+                    fgmfor.append(cutfor[0])
+                    if calc_str:
+                        fgmstr.append(cutstr[0])
+                fgmnrg.append(castep_data['nrg'])
+                fgmfor.append(castep_data['for'])
+                if calc_str:
+                    fgmstr.append(castep_data['str'])
+
+        # Save the results in data files
+
+        cutfile = open(seedname + "_cut_conv.dat", 'w')
+        cutfile.write("Cutoff (eV)\tEnergy (eV)\tForces (eV/A)" + ("\tTotal stresses (GPa)" if calc_str else "") + "\n")
+
+        for i in range(0, len(cutrange)):
+            cutfile.write(str(cutrange[i]) + '\t\t' + str(cutnrg[i]) + '\t\t' + str(cutfor[i]) + ('\t\t' + str(cutstr[i]) if calc_str else '') + '\n')
+        
+        cutfile.close()
+
+        kpnfile = open(seedname + "_kpn_conv.dat", 'w')
+        kpnfile.write("kpoints (tot)\tEnergy (eV)\tForces (eV/A)" + ("\tTotal stresses (GPa)" if calc_str else "") + "\n")
+
+        for i in range(0, len(kpnrange)):
+            kpnfile.write(str(kpnrange[i][0]*kpnrange[i][1]*kpnrange[i][2]) + '\t\t' + str(kpnnrg[i]) + '\t\t' + str(kpnfor[i]) + ('\t\t' + str(kpnstr[i]) if calc_str else '') + '\n')
+
+        kpnfile.close()
+
+        if (conv_fgm):
+            fgmfile = open(seedname + "_fgm_conv.dat", 'w')
+            fgmfile.write("Fine Gmax (eV)\tEnergy (eV)\t\tMax force (eV/A)" + ("\tTotal stress (GPa)" if calc_str else "") + "\tFine Gmax (1/A)\n")
+        
+            for i in range(0, len(fgmrange)):
+                fgmfile.write(str(fgmrange[i]) + '\t\t' + str(fgmnrg[i]) + '\t\t' + str(fgmfor[i]) + ('\t\t' + str(fgmstr[i]) if calc_str else '') + '\t\t' + str(round_digits(cut_to_k(fgmrange[i]), 4)) + '\n')
+            
+            fgmfile.close()
+        
+        # Make an estimate of the best values
+
+        conv_data = {}
+        conv_data['cut'] = {'range': cutrange,
+            'rangestr': [str(c) for c in cutrange],
+            'step': float_par_vals['cutstep'],
+            'nrg': [x/atom_n for x in cutnrg],
+            'for': cutfor}
+        conv_data['kpn'] = {'range': [k[0]*k[1]*k[2] for k in kpnrange],
+            'rangestr': [kgrid(k, 'x') for k in kpnrange],
+            'step': int_par_vals['kpnstep']*3,
+            'nrg': [x/atom_n for x in kpnnrg],
+            'for': kpnfor}
+        conv_data['fgm'] = {'range': fgmrange,
+            'rangestr': [str(f) for f in fgmrange],
+            'step': float_par_vals['fgmstep'],
+            'nrg': [x/atom_n for x in fgmnrg],
+            'for': fgmfor}
+
+        if bool_par_vals['cnvstr']:
+            conv_data['cut']['str'] = cutstr
+            conv_data['kpn']['str'] = kpnstr
+            conv_data['fgm']['str'] = fgmstr
+
+        opt_estimates = conv_estimates(seedname, conv_data, calc_str)
+        
+        # Finally, let's do the plotting
+
+        if str_par_vals["outp"] == "gnuplot":
+            gp_graph(seedname, calc_str)
+
+        elif str_par_vals["outp"] in ("xmgrace", "grace"):
+            agr_graph(seedname, conv_data, calc_str)

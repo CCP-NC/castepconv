@@ -1,2 +1,46 @@
+syntax: glob
+
 example/Si_*
 example/Si.conv_tab
+
+.gitignore
+node_modules
+.c9revisions
+.DS_Store
+Thumbs.db
+
+*.pyc
+*.pyo
+*.pyd
+
+# C extensions
+*.so
+
+# Packages
+*.egg
+*.egg-info
+dist
+build
+eggs
+parts
+bin
+var
+sdist
+develop-eggs
+.installed.cfg
+lib
+lib64
+include
+man
+__pycache__
+
+# Installer logs
+pip-log.txt
+
+# Unit test / coverage reports
+.coverage
+.tox
+nosetests.xml
+
+# Translations
+*.mo

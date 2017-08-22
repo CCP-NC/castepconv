@@ -11,6 +11,8 @@ def find_scale(data):
     # Find common scales for the residuals of the given data
     scales = {}
 
+    print data
+
     for x in _x_types:
 
         if data[x]['range'][0] is None:
@@ -58,6 +60,15 @@ def gp_graph(seedname, data, cnvstr=False):
         out_file.write('set xlabel "{xlabel}"\n'.format(xlabel=xlabel))
         out_file.write('set ylabel "Deviation"\n')
         out_file.write('set xtics nomirror\n')
+
+        # Set the tics specially in case of k-points
+        if x == 'kpn':
+            out_file.write('set xtics (' + 
+                           ', '.join(['"{0}" {1}'.format(rs, r)
+                                      for r, rs in zip(data[x]['range'], 
+                                                       data[x]['rangestr'])]) +
+                           ') rotate by 45 right\n')
+
         out_file.write('set ytics nomirror\n')
         out_file.write('plot ')
         for y, legend in _y_types.iteritems():
@@ -140,8 +151,21 @@ def agr_graph(seedname, data, cnvstr=False):
         out_file.write(
             '@    view 0.150000, 0.150000, 1.150000, 0.850000\n')
         out_file.write('@    xaxis label "' + _x_types[x] + '"\n')
-        out_file.write('@    xaxis tick major ' +
-                       str(data[x]['step']) + '\n')
+
+
+        # Set the tics specially in case of k-points
+        if x == 'kpn':
+            out_file.write("""@    xaxis  tick spec type both
+@    xaxis  tick spec {0}
+@    xaxis ticklabel angle 315\n""".format(len(data[x]['range'])))
+            for i, (r, rs) in enumerate(zip(data[x]['range'],
+                                            data[x]['rangestr'])):
+                out_file.write('@    xaxis tick major {0},{1}\n'.format(i, r))
+                out_file.write('@    xaxis ticklabel {0},"{1}"\n'.format(i, 
+                                                                         rs))
+        else:
+            out_file.write('@    xaxis tick major ' +
+                           str(data[x]['step']) + '\n')
         out_file.write('@    xaxis offset 0.0, 1.0\n')
 
         for y, legend in _y_types.iteritems():

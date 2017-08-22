@@ -17,7 +17,7 @@ def find_scale(data):
             continue
 
         # Maximum deviations from final value
-        Ms = {y: max([abs(d-data[x][y][-1]) for d in data[x][y]])
+        Ms = {y: max([abs(d-data[x][y][-1]) for d in data[x][y]]) if y in data[x] else 0
               for y in _y_types}
         # Proposed scaling factors
         scales[x] = {y: 10**floor(log10(Ms['nrg']/m)) if m > 0 else 1
@@ -61,6 +61,10 @@ def gp_graph(seedname, data, cnvstr=False):
         out_file.write('set ytics nomirror\n')
         out_file.write('plot ')
         for y, legend in _y_types.iteritems():
+
+            if y == 'str' and not cnvstr:
+                continue
+
             scale = scales[x][y]
             lsc = '10^{{{0}}}'.format(-int(log10(scale)))
             out_file.write(('"{file_seed}.dat" using 1:((${col}-({ref}))*{scale})'
@@ -120,6 +124,8 @@ def agr_graph(seedname, data, cnvstr=False):
         # Find the optimal size for the world
         y1rng = [0,0]
         for y in _y_types:
+            if y == 'str' and not cnvstr:
+                continue
             y1 = data[x][y]
             s = scales[x][y]
             y1rng[0] = min(y1rng[0], min([(p-y1[-1])*s for p in y1]))
@@ -167,6 +173,9 @@ def agr_graph(seedname, data, cnvstr=False):
         # Input the actual data
 
         for y in _y_types:
+
+            if y == 'str' and not cnvstr:
+                continue
 
             out_file.write('@target G0.S{0}\n@type xy\n'.format(plot_details[y]['set']))
             for i, c in enumerate(x1):

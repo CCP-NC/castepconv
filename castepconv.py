@@ -1390,27 +1390,30 @@ if __name__ == '__main__':
         # Save the results in data files
 
         cutfile = open(seedname + "_cut_conv.dat", 'w')
-        cutfile.write("Cutoff (eV)\tEnergy (eV)\tForces (eV/A)" + ("\tTotal stresses (GPa)" if calc_str else "") + "\n")
+        cutfile.write("Cutoff (eV)\tEnergy (eV)\tEnergy/Atom (eV)\tForces (eV/A)" + ("\tTotal stresses (GPa)" if calc_str else "") + "\n")
 
         for i in range(0, len(cutrange)):
-            cutfile.write(str(cutrange[i]) + '\t\t' + str(cutnrg[i]) + '\t\t' + str(cutfor[i]) + ('\t\t' + str(cutstr[i]) if calc_str else '') + '\n')
+            cutfile.write(str(cutrange[i]) + '\t\t' + str(cutnrg[i]) + '\t\t' + str(cutnrg[i]/atom_n) + 
+                          '\t\t' + str(cutfor[i]) + ('\t\t' + str(cutstr[i]) if calc_str else '') + '\n')
         
         cutfile.close()
 
         kpnfile = open(seedname + "_kpn_conv.dat", 'w')
-        kpnfile.write("kpoints (tot)\tEnergy (eV)\tForces (eV/A)" + ("\tTotal stresses (GPa)" if calc_str else "") + "\n")
+        kpnfile.write("kpoints (tot)\tEnergy (eV)\tEnergy/Atom (eV)\tForces (eV/A)" + ("\tTotal stresses (GPa)" if calc_str else "") + "\n")
 
         for i in range(0, len(kpnrange)):
-            kpnfile.write(str(kpnrange[i][0]*kpnrange[i][1]*kpnrange[i][2]) + '\t\t' + str(kpnnrg[i]) + '\t\t' + str(kpnfor[i]) + ('\t\t' + str(kpnstr[i]) if calc_str else '') + '\n')
+            kpnfile.write(str(kpnrange[i][0]*kpnrange[i][1]*kpnrange[i][2]) + '\t\t' + str(kpnnrg[i]) + '\t\t' + str(kpnnrg[i]/atom_n) + '\t\t' +
+                          str(kpnfor[i]) + ('\t\t' + str(kpnstr[i]) if calc_str else '') + '\n')
 
         kpnfile.close()
 
         if (conv_fgm):
             fgmfile = open(seedname + "_fgm_conv.dat", 'w')
-            fgmfile.write("Fine Gmax (eV)\tEnergy (eV)\t\tMax force (eV/A)" + ("\tTotal stress (GPa)" if calc_str else "") + "\tFine Gmax (1/A)\n")
+            fgmfile.write("Fine Gmax (eV)\tEnergy (eV)\tEnergy/Atom (eV)\t\tMax force (eV/A)" + ("\tTotal stress (GPa)" if calc_str else "") + "\tFine Gmax (1/A)\n")
         
             for i in range(0, len(fgmrange)):
-                fgmfile.write(str(fgmrange[i]) + '\t\t' + str(fgmnrg[i]) + '\t\t' + str(fgmfor[i]) + ('\t\t' + str(fgmstr[i]) if calc_str else '') + '\t\t' + str(round_digits(cut_to_k(fgmrange[i]), 4)) + '\n')
+                fgmfile.write(str(fgmrange[i]) + '\t\t' + str(fgmnrg[i]) + '\t\t' + str(fgmnrg[i]/atom_n) + '\t\t' + 
+                              str(fgmfor[i]) + ('\t\t' + str(fgmstr[i]) if calc_str else '') + '\t\t' + str(round_digits(cut_to_k(fgmrange[i]), 4)) + '\n')
             
             fgmfile.close()
         
@@ -1443,7 +1446,7 @@ if __name__ == '__main__':
         # Finally, let's do the plotting
 
         if str_par_vals["outp"] == "gnuplot":
-            gp_graph(seedname, calc_str)
+            gp_graph(seedname, conv_data, calc_str)
 
         elif str_par_vals["outp"] in ("xmgrace", "grace"):
             agr_graph(seedname, conv_data, calc_str)

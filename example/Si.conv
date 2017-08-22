@@ -4,6 +4,10 @@
 convergence_task: all
 running_command: castep.serial <seedname>
 
+# The final graphs can be plotted in XMGrace rather than Gnuplot if desired
+#
+# output_type:	  grace
+
 # These parameters, if uncommented, allow you to control the range of cutoff energies and kpoints for your convergence
 #
 # cutoff_min:     200

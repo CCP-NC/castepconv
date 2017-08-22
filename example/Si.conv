@@ -8,6 +8,10 @@ running_command: castep.serial <seedname>
 #
 # output_type:	  grace
 
+# If you give a dryrun command, it will be used to test the input fiels as well as generate pseudopotentials and then use them for all future calculations
+#
+# dryrun_command: castep.serial <seedname> -dryrun
+
 # These parameters, if uncommented, allow you to control the range of cutoff energies and kpoints for your convergence
 #
 # cutoff_min:     200

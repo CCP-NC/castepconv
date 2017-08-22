@@ -11,8 +11,6 @@ def find_scale(data):
     # Find common scales for the residuals of the given data
     scales = {}
 
-    print data
-
     for x in _x_types:
 
         if data[x]['range'][0] is None:

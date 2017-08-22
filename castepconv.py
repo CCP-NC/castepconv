@@ -15,6 +15,7 @@ import shutil
 import glob
 import re
 import copy
+import tempfile
 import subprocess as sp
 from collections import namedtuple
 
@@ -102,6 +103,7 @@ str_par_names = {
     "running_mode": "rmode",
     "output_type": "outp",
     "running_command": "rcmd",
+    "dryrun_command": "drcmd",
     "submission_script": "subs",
     "fine_gmax_mode": "fgmmode",
 }
@@ -111,6 +113,7 @@ str_par_vals = {
     "rmode": "serial",                        # Can be PARALLEL or SERIAL
     "outp": "gnuplot",                       # Can be GNUPLOT or XMGRACE
     "rcmd": "castep <seedname> -dryrun",
+    "drcmd": None,
     "subs": None,
     "fgmmode": None,                            # Can be MIN or MAX
 }
@@ -158,13 +161,13 @@ int_par_vals = {
 bool_par_names = {
     "converge_stress": "cnvstr",
     "reuse_calcs": "rcalc",
-    "serial_reuse": "sruse"
+    "serial_reuse": "sruse",
 }
 
 bool_par_vals = {
     "cnvstr": False,
     "rcalc": False,
-    "sruse": True
+    "sruse": True,
 }
 
 # Physical constants
@@ -432,8 +435,6 @@ def strip_cellfile(fname):
 
         except RuntimeError:
             raise CellError('Bad formatting in .cell file SPECIES_POT block')
-
-        print ppot
 
     if len(hkl_data) == 2:
         for i in range(0, 3):
@@ -956,14 +957,57 @@ def multijob_wait(running_jobs=None, wait_all=False):
         except JobError as JE:
             print __WARNING__ + " - " + str(JE)
 
-# Find and if needed copy the pseudo potential files
+# Run a dryrun to create pseudopotentials
 
+
+def create_pseudopots(seedname, pseudo_pots, tmp):
+
+    global str_par_vals, ovwrite_files
+
+    # Copy .cell and .param files
+    shutil.copy(seedname + '.cell', os.path.join(tmp, seedname + '.cell'))
+    try:
+        shutil.copy(seedname + '.param',
+                    os.path.join(tmp, seedname + '.param'))
+    except IOError:
+        pass  # No big deal
+
+    print "Starting dryrun..."
+    cmd = str_par_vals['drcmd'].replace('<seedname>', seedname)
+    sp.Popen(cmd.split(), cwd=tmp, stdout=sp.PIPE, stderr=sp.PIPE,
+             stdin=sp.PIPE).communicate()
+    print "Dryrun finished"
+    # Did it go well?
+    try:
+        drfile = ('No problems found with input files.' in
+                  open(os.path.join(tmp, seedname + '.castep')).readlines()[-9])
+    except IOError:
+        print __WARNING__ + ": dryrun failed"
+
+    # Ok, grab pseudopotentials
+    if drfile:
+        ppot_files = glob.glob(os.path.join(tmp, '*.usp'))
+        for ppf in ppot_files:
+            bname = os.path.basename(ppf)
+            el = bname.split('_')[0]
+            pseudo_pots.append(PPotEntry(el, ppf, True))
+    else:
+        print __WARNING__ + ": dryrun failed"
+
+
+# Find and if needed copy the pseudo potential files
 
 def find_pseudopots(seedname, pseudo_pots):
 
-    global ovwrite_files
+    global ovwrite_files, str_par_vals
 
-    # First: check whether there are pseudo pots at all
+    tmp = None
+    if str_par_vals['drcmd'] is not None:
+        # Start a dryrun in a temporary directory
+        tmp = tempfile.mkdtemp(dir=os.getcwd())
+        create_pseudopots(seedname, pseudo_pots, tmp)
+
+    # Check whether there are pseudo pots at all
 
     if (pseudo_pots is None) or (len(pseudo_pots) == 0):
         return
@@ -1004,12 +1048,16 @@ def find_pseudopots(seedname, pseudo_pots):
                              pp_folder, bname))
 
                 pseudo_pots[i] = PPotEntry(ppot.element,
-                                           os.path.join('..', pp_folder, 
-                                                        bname), 
+                                           os.path.join('..', pp_folder,
+                                                        bname),
                                            True)
             else:
                 raise PotError("Pseudo potential file " +
                                ppot.entry + " could not be found")
+
+    if tmp is not None:
+        # Remove it
+        shutil.rmtree(tmp)
 
 # Fill in the fine gmax parameters after parsing the .conv file
 

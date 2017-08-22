@@ -1,5 +1,6 @@
 \documentclass[10pt]{article}
 \usepackage{listings}
+\usepackage{lmodern}
 
 \title{CASTEP convergence automation tool 1.0 User Guide}
 \author{Simone Sturniolo}
@@ -101,6 +102,14 @@ created. Both GNUPLOT and GRACE are supported. Default is GNUPLOT.\newline
 should be expressed by replacing the name of the job with the generic token 
 \textless \textit{seedname}\textgreater. Default is \textit{castep \textless 
 seedname\textgreater -dryrun}.\newline
+\textit{Legal values}: any string. If it contains the token \textless 
+\textit{seedname}\textgreater, it will be appropriately replaced.\newline
+
+\textbf{dryrun\_command}: Command line that should be used to run a simple dryrun. This 
+should be expressed by replacing the name of the job with the generic token 
+\textless \textit{seedname}\textgreater. If present, during input creation a dryrun will be executed,
+to test the input files and create pseudopotential files that will be then recycled in the successive runs.
+Default is None.\newline
 \textit{Legal values}: any string. If it contains the token \textless 
 \textit{seedname}\textgreater, it will be appropriately replaced.\newline
 
@@ -334,10 +343,9 @@ Finally, let's consider how to run a fine Gmax convergence job. When running thi
 
 \begin{itemize}
  \item A series of lines redefining a new range for both cutoff and k-points of one point each - this is done for convenience, in order to avoid having to repeat needless calculations;
- \item The instructions defining the actual testing range for fine Gmax. Please note that since \textit{fine_gmax_mode} is set to \textit{min_cutoff}, the value of the minimum cutoff as defined in the above lines (i.e. $400\,\mathrm{eV}$) will be used. Of course since in this example the same value is used for both minimum AND maximum cutoff, using \textit{max_cutoff} wouldn't have changed much. The advice, however, is to use \textit{max_cutoff} whenever you are running a convergence where you are not yet sure of what the converged cutoff value is either.
+ \item The instructions defining the actual testing range for fine Gmax. Please note that since \textit{fine\_gmax\_mode} is set to \textit{min\_cutoff}, the value of the minimum cutoff as defined in the above lines (i.e. $400\,\mathrm{eV}$) will be used. Of course since in this example the same value is used for both minimum AND maximum cutoff, using \textit{max\_cutoff} wouldn't have changed much. The advice, however, is to use \textit{max\_cutoff} whenever you are running a convergence where you are not yet sure of what the converged cutoff value is either.
 \end{itemize}
 
-A good thing could be to copy the \textit{Si.cell, Si.param} and \textit{Si.conv} files into a new folder and run the convergence anew, so that you don't delete your previous results. Wait for the convergence to finish running and that's it! You're done. You can check a plot and the usual data about the fine Gmax convergence by reading the \textit{Si_fgm_conv.gp} and \textit{Si_fgm_conv.dat} files. If you used stress convergence, there will also be two \textit{Si_fgm_str_conv.*} files.
+A good thing could be to copy the \textit{Si.cell, Si.param} and \textit{Si.conv} files into a new folder and run the convergence anew, so that you don't delete your previous results. Wait for the convergence to finish running and that's it! You're done. You can check a plot and the usual data about the fine Gmax convergence by reading the \textit{Si\_fgm\_conv.gp} and \textit{Si\_fgm\_conv.dat} files. If you used stress convergence, there will also be two \textit{Si\_fgm\_str\_conv.*} files.
 
 \end{document}
-

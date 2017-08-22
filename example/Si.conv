@@ -22,7 +22,7 @@ running_command: castep.serial <seedname>
 
 # Here if you want to converge stresses as well
 #
-converge_stress: true
+# converge_stress: true
 
 # This allows you to displace slightly the atoms from their equilibrium positions in order to introduce a non-zero force to converge in the system
 #

@@ -572,16 +572,16 @@ def jobfinish_check(foldname, jobname):
 def parse_forces(cfile):
 
     global _CASTEP_FORCEENDRE
-
     max_for = 0.0
 
     for l in cfile[6:]:
 
         if _CASTEP_FORCEENDRE.findall(l) != []:
-            return max_for
-
         try:
-            cur_for = math.sqrt(sum([float(x)**2.0 for x in l.split()[3:6]]))
+            F = [float(x)**2.0 for x in l.split()[3:6]]
+            if len(F) != 3:
+                return max_for
+            cur_for = math.sqrt(sum(F))
         except ValueError:
             pass
         if cur_for > max_for:

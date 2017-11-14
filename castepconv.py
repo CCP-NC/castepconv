@@ -577,11 +577,9 @@ def parse_forces(cfile):
     for l in cfile[6:]:
 
         if _CASTEP_FORCEENDRE.findall(l) != []:
+            return max_for
         try:
-            F = [float(x)**2.0 for x in l.split()[3:6]]
-            if len(F) != 3:
-                return max_for
-            cur_for = math.sqrt(sum(F))
+            cur_for = math.sqrt(sum([float(x)**2.0 for x in l.split()[3:6]]))
         except ValueError:
             pass
         if cur_for > max_for:

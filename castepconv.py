@@ -178,7 +178,7 @@ __CASTEP_ENERGY__       = "Final energy, E             ="
 __CASTEP_ENERGY_FIX__   = "Final energy ="
 __CASTEP_FORCES__       = "***************** Symmetrised Forces *****************"
 __CASTEP_FORCES_ALT__   = "*********************** Forces ***********************"
-__CASTEP_FORCES_END__   = "*                                                    *"
+__CASTEP_FORCES_ALT2__  = "******************* Unconstrained Forces *******************"
 __CASTEP_STRESSES__     = "*********** Symmetrised Stress Tensor ***********"
 __CASTEP_STRESSES_ALT__ = "***************** Stress Tensor *****************"
 __CASTEP_STRESSES_END__ = "*                                               *"
@@ -473,17 +473,15 @@ def jobfinish_check(foldname, jobname):
 
 def parse_forces(cfile):
 
-    global __CASTEP_FORCES_END__
-
     max_for = 0.0
 
     for l in cfile[6:]:
 
-        if __CASTEP_FORCES_END__ in l:
-            return max_for
-
         try:
-            cur_for = math.sqrt(sum([float(x)**2.0 for x in l.split()[3:6]]))
+            F = [float(x)**2.0 for x in l.split()[3:6]]
+            if len(F) != 3:
+                return max_for
+            cur_for = math.sqrt(sum(F))
         except ValueError:
             pass
         if cur_for > max_for:
@@ -519,8 +517,9 @@ def parse_stresses(cfile):
 def parse_castep_file(cfile, filepath):
 
     global bool_par_vals, has_fix_occ
-    global __CASTEP_ATOMN__, __CASTEP_CUTOFF__, __CASTEP_ENERGY_FIX__, __CASTEP_ENERGY__, __CASTEP_FINEGMAX__, __CASTEP_FORCES_ALT__
-    global __CASTEP_FORCES_END__, __CASTEP_FORCES__, __CASTEP_HEADER__, __CASTEP_KPOINTS__, __CASTEP_STRESSES_ALT__
+    global __CASTEP_ATOMN__, __CASTEP_CUTOFF__, __CASTEP_ENERGY_FIX__, __CASTEP_ENERGY__
+    global __CASTEP_FINEGMAX__, __CASTEP_FORCES_ALT__, __CASTEP_FORCES_ALT2__
+    global __CASTEP_FORCES__, __CASTEP_HEADER__, __CASTEP_KPOINTS__, __CASTEP_STRESSES_ALT__
     global __CASTEP_STRESSES_ALT__, __CASTEP_STRESSES_END__, __CASTEP_STRESSES__
 
     atom_n = None
@@ -550,7 +549,7 @@ def parse_castep_file(cfile, filepath):
                 i_nrg = float(l.split()[4])
             elif __CASTEP_ENERGY_FIX__ in l and has_fix_occ:
                 i_nrg = float(l.split()[3])
-            elif __CASTEP_FORCES__ in l or __CASTEP_FORCES_ALT__ in l:
+            elif __CASTEP_FORCES__ in l or __CASTEP_FORCES_ALT__ in l or __CASTEP_FORCES_ALT2__ in l:
                 i_for = parse_forces(castepfile[start_l+i:])
             elif calc_str and (__CASTEP_STRESSES__ in l or __CASTEP_STRESSES_ALT__ in l):
                 i_str = parse_stresses(castepfile[start_l+i:])

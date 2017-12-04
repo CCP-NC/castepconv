@@ -208,9 +208,9 @@ __CASTEP_FINEGMAX__ = "size of   fine   gmax                          :"
 __CASTEP_ENERGY__ = "Final energy, E             ="
 __CASTEP_ENERGY_FIX__ = "Final energy ="
 
-_CASTEP_FORCERE = re.compile('[\*]+ [a-zA-Z\s]+ Forces [\*]+')
+_CASTEP_FORCERE = re.compile('[\*]+[a-zA-Z\s]+Forces\s+[\*]+')
 _CASTEP_FORCEENDRE = re.compile('\*[\s]+\*')
-_CASTEP_STRESSRE = re.compile('[\*]+ [a-zA-Z\s]+ Stress Tensor [\*]+')
+_CASTEP_STRESSRE = re.compile('[\*]+[a-zA-Z\s]+Stress Tensor\s+[\*]+')
 _CASTEP_STRESSENDRE = _CASTEP_FORCEENDRE
 
 # A definition for an entry in the pseudopotential block

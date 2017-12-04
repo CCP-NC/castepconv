@@ -482,7 +482,7 @@ def strip_paramfile(fname):
 
 def displace_cell_atoms(cfile, abc, d):
 
-    u = None
+    u = length_units['ang'] # Default
 
     # Are positions absolute or fractionary?
     pos_is_abs = cfile.freeform_present('positions_abs')
@@ -507,16 +507,13 @@ def displace_cell_atoms(cfile, abc, d):
                 # The displacement is in alternated directions, since otherwise you'd still get an equilibrium structure
                 # Won't work for single atom unit cells. This needs fixing. It
                 # might also break if there are symmetries in the system.
+                print(l_split)
+                print(xyz)
                 fac = (i % 2)*2-1
                 if pos_is_abs:
-                    # l = l_split[0] + '\t' + str(u*xyz[0]+fac*d) + '\t' +
-                    # str(u*xyz[1]+fac*d) + '\t' + str(u*xyz[2]+fac*d) + '\n'
                     l = '{0} {1} {2} {3}'.format(
                         *[l_split[0]] + [u*x+fac*d for x in xyz])
                 else:
-                    # l = l_split[0] + '\t' + str(xyz[0]+fac*d/abc[0]) + '\t' +
-                    # str(xyz[1]+fac*d/abc[1]) + '\t' +
-                    # str(xyz[2]+fac*d/abc[2]) + '\n'
                     l = '{0} {1} {2} {3}'.format(
                         *[l_split[0]] + [x+fac*d/abc[j] for j, x in enumerate(xyz)])
             except ValueError:

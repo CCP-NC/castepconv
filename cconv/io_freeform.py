@@ -165,12 +165,13 @@ class io_freeform_file(object):
             except ValueError:
                 pass    # No comments in this line
             
-            lsplit = l.replace(':', ' ').split()
+            l = l.strip()
 
-            if len(lsplit) == 0:
-                # Empty
+            if l == '':
+                # Empty line... skip
                 continue
-            
+
+            lsplit = re.split('\s*[:=]*\s+', l, 1)
             
             # Are we reading a block or not?
             
@@ -181,7 +182,7 @@ class io_freeform_file(object):
                     else:
                         read_block = False
                 else:
-                    self.keyvals[keyw] += [' '.join(lsplit)]
+                    self.keyvals[keyw] += [l]
             else:
                 # Check the first word
                 

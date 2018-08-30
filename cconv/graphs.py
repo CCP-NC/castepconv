@@ -17,7 +17,8 @@ def find_scale(data):
             continue
 
         # Maximum deviations from final value
-        Ms = {y: max([abs(d-data[x][y][-1]) for d in data[x][y]]) if y in data[x] else 0
+        Ms = {y: max([abs(d-data[x][y][-1]) for d in data[x][y]])
+              if y in data[x] else 0
               for y in _y_types}
         # Proposed scaling factors
         scales[x] = {y: 10**floor(log10(Ms['nrg']/m)) if m > 0 else 1
@@ -61,9 +62,9 @@ def gp_graph(seedname, data, cnvstr=False):
 
         # Set the tics specially in case of k-points
         if x == 'kpn':
-            out_file.write('set xtics (' + 
+            out_file.write('set xtics (' +
                            ', '.join(['"{0}" {1}'.format(rs, r)
-                                      for r, rs in zip(data[x]['range'], 
+                                      for r, rs in zip(data[x]['range'],
                                                        data[x]['rangestr'])]) +
                            ') rotate by 45 right\n')
 
@@ -76,13 +77,15 @@ def gp_graph(seedname, data, cnvstr=False):
 
             scale = scales[x][y]
             lsc = '10^{{{0}}}'.format(-int(log10(scale)))
-            out_file.write(('"{file_seed}.dat" using 1:((${col}-({ref}))*{scale})'
+            out_file.write(('"{file_seed}.dat" using '
+                            '1:((${col}-({ref}))*{scale})'
                             ' with linespoints pt 7 lc {lc} '
                             'ti "{legend}",').format(file_seed=file_seed,
                                                      scale=scale,
-                                                      legend=legend.format(scale=lsc),
-                                                      ref=data[x][y][-1],
-                                                      **plot_details[y])
+                                                     legend=legend.format(
+                                                         scale=lsc),
+                                                     ref=data[x][y][-1],
+                                                     **plot_details[y])
                            )
         out_file.write(' 0 lt 0 lc 0 notitle\n')
 
@@ -131,7 +134,7 @@ def agr_graph(seedname, data, cnvstr=False):
         out_file.write('@g0 on\n@g0 hidden false\n@with g0\n')
 
         # Find the optimal size for the world
-        y1rng = [0,0]
+        y1rng = [0, 0]
         for y in _y_types:
             if y == 'str' and not cnvstr:
                 continue
@@ -150,7 +153,6 @@ def agr_graph(seedname, data, cnvstr=False):
             '@    view 0.150000, 0.150000, 1.150000, 0.850000\n')
         out_file.write('@    xaxis label "' + _x_types[x] + '"\n')
 
-
         # Set the tics specially in case of k-points
         if x == 'kpn':
             out_file.write("""@    xaxis  tick spec type both
@@ -159,7 +161,7 @@ def agr_graph(seedname, data, cnvstr=False):
             for i, (r, rs) in enumerate(zip(data[x]['range'],
                                             data[x]['rangestr'])):
                 out_file.write('@    xaxis tick major {0},{1}\n'.format(i, r))
-                out_file.write('@    xaxis ticklabel {0},"{1}"\n'.format(i, 
+                out_file.write('@    xaxis ticklabel {0},"{1}"\n'.format(i,
                                                                          rs))
         else:
             out_file.write('@    xaxis tick major ' +
@@ -172,10 +174,10 @@ def agr_graph(seedname, data, cnvstr=False):
 
             # Cutoff vs energy and forces
 
-
             y1 = data[x][y]
             set_header = '@    s{set}'.format(**plot_details[y])
-            lsc = legend.format(scale='10\S{0}\N'.format(-int(log10(scales[x][y]))))
+            lsc = legend.format(scale='10\S{0}\N'.format(
+                -int(log10(scales[x][y]))))
 
             out_file.write("""
 @    yaxis label "Final energy (eV/atom)"
@@ -189,8 +191,9 @@ def agr_graph(seedname, data, cnvstr=False):
 {set_header} symbol color {lc}
 {set_header} symbol fill color {lc}
 {set_header} symbol fill pattern 1
-""".format(set_header=set_header, legend=lsc, 
-           ytick=0.25*10**(floor(log10((y1rng[1]-y1rng[0])))), **plot_details[y]))
+""".format(set_header=set_header, legend=lsc,
+                ytick=0.25*10**(floor(log10((y1rng[1]-y1rng[0])))),
+                **plot_details[y]))
 
         # Input the actual data
 
@@ -199,9 +202,11 @@ def agr_graph(seedname, data, cnvstr=False):
             if y == 'str' and not cnvstr:
                 continue
 
-            out_file.write('@target G0.S{0}\n@type xy\n'.format(plot_details[y]['set']))
+            out_file.write('@target G0.S{0}\n@type xy\n'.format(
+                plot_details[y]['set']))
             for i, c in enumerate(x1):
-                out_file.write('{x}\t{y}\n'.format(x=c, y=(data[x][y][i]-data[x][y][-1])*scales[x][y]))
+                out_file.write('{x}\t{y}\n'.format(
+                    x=c, y=(data[x][y][i]-data[x][y][-1])*scales[x][y]))
             out_file.write('&\n')
 
         out_file.close()

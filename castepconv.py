@@ -89,6 +89,7 @@ class PotError(Exception):
 
 # Util: ANSI colored WARNING text
 
+
 __WARNING__ = '\033[93mWARNING\033[0m'
 
 # Length units allowed by CASTEP. Internally used unit is always Angstroms
@@ -109,13 +110,17 @@ str_par_names = {
 }
 
 str_par_vals = {
-    "ctsk": "input",                         # Can be INPUT, INPUTRUN, OUTPUT or ALL
-    "rmode": "serial",                        # Can be PARALLEL or SERIAL
-    "outp": "gnuplot",                       # Can be GNUPLOT or XMGRACE
+    # Can be INPUT, INPUTRUN, OUTPUT or ALL
+    "ctsk": "input",
+    # Can be PARALLEL or SERIAL
+    "rmode": "serial",
+    # Can be GNUPLOT or XMGRACE
+    "outp": "gnuplot",
     "rcmd": "castep <seedname> -dryrun",
     "drcmd": None,
     "subs": None,
-    "fgmmode": None,                            # Can be MIN or MAX
+    # Can be MIN or MAX
+    "fgmmode": None,
 }
 
 float_par_names = {
@@ -285,8 +290,10 @@ def parse_convfile(cfile):
                 cline[1] = cline[1].lower()
             else:
                 # A basic sanity check
-                if str_par_names[par_name] == 'rcmd' and '<seedname>' not in cline[1]:
-                    print(__WARNING__ + ": running_command does not contain a <seedname> tag.\n"
+                if (str_par_names[par_name] == 'rcmd' and
+                        '<seedname>' not in cline[1]):
+                    print(__WARNING__ + ": running_command does not contain "
+                          "a <seedname> tag.\n"
                           "This is likely erroneous. Please check.\n")
             str_par_vals[str_par_names[par_name]] = cline[1].strip()
         elif (par_name in float_par_names):
@@ -334,7 +341,8 @@ def parse_conv_tab_file(cfile):
 
     return cutrange, kpnrange, fgmrange
 
-# Strip .cell file from unnecessary lines to get only the ones we care for (i.e. remove all reference to kpoints, we're going to put those in ourselves)
+# Strip .cell file from unnecessary lines to get only the ones we care for
+# (i.e. remove all reference to kpoints, we're going to put those in ourselves)
 # Also read cell parameters and construct the proper kpn_base
 
 
@@ -353,7 +361,8 @@ def strip_cellfile(fname):
 
     # Remove everything having to do with kpoints
 
-    for k in ("kpoints_mp_grid", "kpoint_mp_grid", "kpoints_mp_spacing", "kpoint_mp_spacing", "kpoints_list", "kpoint_list"):
+    for k in ("kpoints_mp_grid", "kpoint_mp_grid", "kpoints_mp_spacing",
+              "kpoint_mp_spacing", "kpoints_list", "kpoint_list"):
         stripped.freeform_remove(k)
 
     # Read lattice parameters
@@ -423,7 +432,8 @@ def strip_cellfile(fname):
                 elif len(l_split) == 2:
                     # File, library or string?
                     seed, ext = os.path.splitext(l_split[1])
-                    if len(pspotline_regex.findall(l_split[1])) > 1 or ext == '':
+                    if (len(pspotline_regex.findall(l_split[1])) > 1 or
+                            ext == ''):
                         # String or library
                         ppot.append(PPotEntry(l_split[0], l_split[1], False))
                     elif ext.lower() in ('.usp', '.recpot', '.ucf'):
@@ -442,8 +452,10 @@ def strip_cellfile(fname):
                            [i-2]*math.sin(hkl_data[1][i]))
     elif len(hkl_data) == 3:
         for i in range(0, 3):
-            kbase[i] = math.sqrt(sum([(hkl_data[i-2][j-2]*hkl_data[i-1][j-1] - hkl_data[
-                                 i-2][j-1]*hkl_data[i-1][j-2])**2.0 for j in range(0, 3)]))
+            kbase[i] = math.sqrt(sum([(hkl_data[i-2][j-2]*hkl_data[i-1][j-1] -
+                                       hkl_data[i-2][j-1]*hkl_data[i-1][j-2]
+                                       )**2.0
+                                      for j in range(0, 3)]))
 
     kbase = tuple([k/min(kbase) for k in kbase])
 
@@ -482,7 +494,7 @@ def strip_paramfile(fname):
 
 def displace_cell_atoms(cfile, abc, d):
 
-    u = length_units['ang'] # Default
+    u = length_units['ang']  # Default
 
     # Are positions absolute or fractionary?
     pos_is_abs = cfile.freeform_present('positions_abs')
@@ -504,7 +516,8 @@ def displace_cell_atoms(cfile, abc, d):
                     'Bad formatting in .cell file POSITION_* block')
             try:
                 xyz = [float(x) for x in l_split[1:]]
-                # The displacement is in alternated directions, since otherwise you'd still get an equilibrium structure
+                # The displacement is in alternated directions, since otherwise
+                # you'd still get an equilibrium structure
                 # Won't work for single atom unit cells. This needs fixing. It
                 # might also break if there are symmetries in the system.
                 print(l_split)
@@ -515,7 +528,8 @@ def displace_cell_atoms(cfile, abc, d):
                         *[l_split[0]] + [u*x+fac*d for x in xyz])
                 else:
                     l = '{0} {1} {2} {3}'.format(
-                        *[l_split[0]] + [x+fac*d/abc[j] for j, x in enumerate(xyz)])
+                        *[l_split[0]] + [x+fac*d/abc[j] for j, x in
+                                         enumerate(xyz)])
             except ValueError:
                 raise CellError(
                     'Bad formatting in .cell file POSITION_* block')
@@ -615,7 +629,8 @@ def parse_stresses(cfile):
 def parse_castep_file(cfile, filepath):
 
     global bool_par_vals, has_fix_occ
-    global __CASTEP_ATOMN__, __CASTEP_CUTOFF__, __CASTEP_ENERGY_FIX__, __CASTEP_ENERGY__, __CASTEP_FINEGMAX__
+    global __CASTEP_ATOMN__, __CASTEP_CUTOFF__, __CASTEP_ENERGY_FIX__
+    global __CASTEP_ENERGY__, __CASTEP_FINEGMAX__
     global __CASTEP_HEADER__, __CASTEP_KPOINTS__
     global _CASTEP_FORCERE, _CASTEP_STRESSRE
 
@@ -654,8 +669,10 @@ def parse_castep_file(cfile, filepath):
         except CastepError as CE:
             raise CE
 
-        if atom_n is not None and i_nrg is not None and i_for is not None and cut_check is not None and kpn_check is not None and fgm_check is not None \
-                and ((calc_str and i_str is not None) or not calc_str):
+        if (atom_n is not None and i_nrg is not None and i_for is not None and
+            cut_check is not None and kpn_check is not None and
+            fgm_check is not None and ((calc_str and i_str is not None) or
+                                       not calc_str)):
             break
 
     return {
@@ -715,17 +732,19 @@ def conv_estimates(seedname, data, cnvstr=False):
             # Cases where we can't say anything meaningful
             if len(dataset) < 2:
                 # 1. If there's only one point
-                out_string += "Impossible to give a convergence estimate with a single " + \
-                    x_name + " point\n"
+                out_string += "Impossible to give a convergence estimate "
+                "with a single " + x_name + " point\n"
             elif tol <= 0.0:
                 # 2. If the tolerance value is unphysical
-                out_string += "Impossible to give a convergence estimate with a null or negative value for " + \
-                    y_name + " tolerance\n"
+                out_string += ("Impossible to give a convergence estimate with"
+                               " a null or negative value for " +
+                               y_name + " tolerance\n")
             elif all([abs(dpoint) < tol for dpoint in dataset]):
                 # 3. The values are so small (in absolute sense) that there is
                 # nothing to converge (e.g. forces with an equilibrated system)
-                out_string += "Impossible to give a convergence estimate with " + \
-                    y_name + " values lower than the tolerance \n"
+                out_string += ("Impossible to give a convergence estimate "
+                               "with " + y_name + " values lower than "
+                               "the tolerance \n")
             else:
 
                 delta = dataset[0]
@@ -734,13 +753,19 @@ def conv_estimates(seedname, data, cnvstr=False):
 
                     delta = abs(val - delta)
                     if delta < tol:
-                        out_string += "Based on converging " + y_name + " to " + \
-                            str(tol) + " " + y_unit + ", minimum " + x_name + \
-                            " suggested is " + \
-                            str(data[x]['rangestr'][i]) + " " + x_unit
+                        out_string += ("Based on converging " + y_name +
+                                       " to " + str(tol) + " " + y_unit +
+                                       ", minimum " +
+                                       x_name + " suggested is " +
+                                       str(data[x]['rangestr'][i]) + " " +
+                                       x_unit)
                         if (x == 'fgm'):
-                            out_string += " (corresponding to a value of " + str(
-                                round_digits(cut_to_k(data[x]['range'][i]), 4)) + " 1/Ang)\n"
+                            out_string += (" (corresponding to a value of " +
+                                           str(
+                                               round_digits(cut_to_k(
+                                                   data[x]['range'][i]),
+                                                   4)) +
+                                           " 1/Ang)\n")
                         else:
                             out_string += "\n"
 
@@ -750,8 +775,11 @@ def conv_estimates(seedname, data, cnvstr=False):
                     delta = val
 
                     if i == len(dataset[1:])-1:
-                        out_string += "Unable to converge " + x_name + " with " + y_name + \
-                            " within given range.  Try increasing maximum " + x_name + " for your search\n"
+                        out_string += ("Unable to converge " + x_name +
+                                       " with " + y_name +
+                                       " within given range.  Try " +
+                                       "increasing maximum " + x_name +
+                                       " for your search\n")
 
     out_string += "\n"
 
@@ -801,15 +829,25 @@ def parse_cmd_args():
     if has_ap:
         parser = ap.ArgumentParser()
         parser.add_argument("seedname", type=str, default=None,
-                            help="Seedname of the convergence job to run - must be the name of the .cell file before the extension.")
-        parser.add_argument('-t', '--task', type=str, default=None, help="Task to run - can be c (clear), i (input), ir (inputrun), o (output) or a (all). Overrides the .conv file value",
-                            dest="task", choices=['c', 'i', 'ir', 'o', 'a'])
+                            help=("Seedname of the convergence job to run - " +
+                                  "must be the name of the .cell file before" +
+                                  " the extension."))
+        parser.add_argument('-t', '--task', type=str, default=None,
+                            dest="task", choices=['c', 'i', 'ir', 'o', 'a'],
+                            help=("Task to run - can be c (clear), i (input),"
+                                  " ir (inputrun), o (output) or a (all). "
+                                  "Overrides the .conv file value"),
+                            )
         args = parser.parse_args()
         return args.seedname, args.task
     else:
         parser = op.OptionParser()
-        parser.add_option('-t', '--task', default=None, help="Task to run - can be c (clear), i (input), ir (inputrun), o (output) or a (all). Overrides the .conv file value",
-                          dest="task", choices=['c', 'i', 'ir', 'o', 'a'])
+        parser.add_option('-t', '--task', default=None,
+                          dest="task", choices=['c', 'i', 'ir', 'o', 'a'],
+                          help=("Task to run - can be c (clear), i (input),"
+                                " ir (inputrun), o (output) or a (all)."
+                                " Overrides the .conv file value"),
+                          )
         (options, args) = parser.parse_args()
         if len(args) != 1:
             seedname = None
@@ -822,14 +860,18 @@ def parse_cmd_args():
 
 def create_conv_folder(foldname, jobname, cut, kpn, fgm, prev_jobname=None):
 
-    global ovwrite_files, stripped_cell, stripped_param, bool_par_vals, str_par_vals, pseudo_pots, sscript
+    global ovwrite_files, stripped_cell, stripped_param, bool_par_vals
+    global str_par_vals, pseudo_pots, sscript
 
     if not os.path.exists(foldname):
         print "Creating folder " + foldname
         os.makedirs(foldname)
-    elif not ovwrite_files and len(os.listdir(foldname)) > 0 and prev_jobname is None:
-        to_del = raw_input(__WARNING__ + ": folder " + foldname + " already exists. \n"
-                           "Some files might be overwritten. Continue (y/N/y-all)?")
+    elif (not ovwrite_files and len(os.listdir(foldname)) > 0 and
+          prev_jobname is None):
+        to_del = raw_input(__WARNING__ + ": folder " + foldname +
+                           " already exists. \n"
+                           "Some files might be overwritten. "
+                           "Continue (y/N/y-all)?")
         if to_del.lower() == 'y-all':
             ovwrite_files = True
         elif to_del.lower() != 'y':
@@ -892,7 +934,9 @@ def job_run(foldname, jobname, running_jobs=None):
 
     os.chdir(foldname)
 
-    if os.path.isfile(jobname + ".castep") or os.path.isfile(jobname + ".check") or os.path.isfile(jobname + ".0001.err"):
+    if (os.path.isfile(jobname + ".castep") or
+        os.path.isfile(jobname + ".check") or
+            os.path.isfile(jobname + ".0001.err")):
         print "Removing output files from previous jobs for " + jobname
         if os.path.isfile(jobname + ".castep"):
             os.remove(jobname + ".castep")
@@ -907,7 +951,8 @@ def job_run(foldname, jobname, running_jobs=None):
         if os.path.isfile(stdin_file):
             stdin_file = open(stdin_file, 'r')
         else:
-            sys.exit("ERROR - STDIN redirected from inexistent file " + stdin_file)
+            sys.exit("ERROR - STDIN redirected from inexistent file " +
+                     stdin_file)
     if (stdout_file is not None):
         stdout_file = open(stdout_file, 'w')
 
@@ -937,10 +982,13 @@ def multijob_wait(running_jobs=None, wait_all=False):
     if (running_jobs is not None):
         # PARALLEL operation case
         if int_par_vals["maxjobs"] > 0 or wait_all:
-            while (not wait_all and len(running_jobs) >= int_par_vals["maxjobs"]) or (wait_all and (len(running_jobs) > 0)):
+            while ((not wait_all and len(running_jobs) >=
+                    int_par_vals["maxjobs"]) or
+                   (wait_all and (len(running_jobs) > 0))):
                 for job_ind in range(len(running_jobs)-1, -1, -1):
                     try:
-                        if jobfinish_check(running_jobs[job_ind][0], running_jobs[job_ind][1]):
+                        if jobfinish_check(running_jobs[job_ind][0],
+                                           running_jobs[job_ind][1]):
                             del running_jobs[job_ind]
                     except JobError as JE:
                         del running_jobs[job_ind]
@@ -975,7 +1023,8 @@ def create_pseudopots(seedname, pseudo_pots, tmp):
     # Did it go well?
     try:
         drfile = ('No problems found with input files.' in
-                  open(os.path.join(tmp, seedname + '.castep')).readlines()[-9])
+                  open(os.path.join(tmp,
+                                    seedname + '.castep')).readlines()[-9])
     except IOError:
         print __WARNING__ + ": dryrun failed"
 
@@ -1024,8 +1073,9 @@ def find_pseudopots(seedname, pseudo_pots):
         if not ppot.is_file:
             continue
 
-        if default_path is None or not os.path.isfile(os.path.join(default_path,
-                                                                   ppot.entry)):
+        if (default_path is None or
+            not os.path.isfile(os.path.join(default_path,
+                                            ppot.entry))):
 
             bname = os.path.basename(ppot.entry)
             # Exclude that pseudopotentials are just pseudopotential LINES
@@ -1033,8 +1083,10 @@ def find_pseudopots(seedname, pseudo_pots):
                 if not os.path.exists(pp_folder):
                     os.makedirs(pp_folder)
                 elif not ovwrite_files:
-                    to_del = raw_input(__WARNING__ + ": folder " + pp_folder + " already exists.\n"
-                                       "Some files might be overwritten. Continue (y/N/y-all)?")
+                    to_del = raw_input(__WARNING__ + ": folder " + pp_folder +
+                                       " already exists.\n"
+                                       "Some files might be overwritten. "
+                                       "Continue (y/N/y-all)?")
                     if to_del.lower() == 'y-all':
                         ovwrite_files = True
                     elif to_del.lower() != 'y':
@@ -1070,13 +1122,16 @@ def fgmax_validate():
             float_par_vals['fgmmin'] = __gscale__**2*float_par_vals['cutmin']
         elif float_par_vals['fgmmin'] < __gscale__**2*float_par_vals['cutmin']:
             raise ConvError("fine_gmax_min must be greater or equal than " +
-                            str(__gscale__**2) + "*cutoff_min for fine_gmax_mode = MIN")
+                            str(__gscale__**2) +
+                            "*cutoff_min for fine_gmax_mode = MIN")
         if float_par_vals['fgmmax'] is None:
             float_par_vals['fgmmax'] = float_par_vals[
                 'fgmmin']+3.0*float_par_vals['fgmstep']
-        elif float_par_vals['fgmmax'] <= __gscale__**2*float_par_vals['cutmin']:
+        elif (float_par_vals['fgmmax'] <=
+              __gscale__**2*float_par_vals['cutmin']):
             raise ConvError("fine_gmax_max must be greater than " +
-                            str(__gscale__**2) + "*cutoff_min for fine_gmax_mode = MIN")
+                            str(__gscale__**2) +
+                            "*cutoff_min for fine_gmax_mode = MIN")
         elif float_par_vals['fgmmax'] <= float_par_vals['fgmmin']:
             raise ConvError("Invalid fine Gmax range defined in .conv file")
     elif fgmmode == 'max_cutoff':
@@ -1084,13 +1139,16 @@ def fgmax_validate():
             float_par_vals['fgmmin'] = __gscale__**2*float_par_vals['cutmax']
         elif float_par_vals['fgmmin'] < __gscale__**2*float_par_vals['cutmax']:
             raise ConvError("fine_gmax_min must be greater or equal than " +
-                            str(__gscale__**2) + "*cutoff_max for fine_gmax_mode = MAX")
+                            str(__gscale__**2) +
+                            "*cutoff_max for fine_gmax_mode = MAX")
         if float_par_vals['fgmmax'] is None:
             float_par_vals['fgmmax'] = float_par_vals[
                 'fgmmin']+3.0*float_par_vals['fgmstep']
-        elif float_par_vals['fgmmax'] <= __gscale__**2*float_par_vals['cutmax']:
+        elif (float_par_vals['fgmmax'] <=
+              __gscale__**2*float_par_vals['cutmax']):
             raise ConvError("fine_gmax_max must be greater than " +
-                            str(__gscale__**2) + "*cutoff_max for fine_gmax_mode = MAX")
+                            str(__gscale__**2) +
+                            "*cutoff_max for fine_gmax_mode = MAX")
         elif float_par_vals['fgmmax'] <= float_par_vals['fgmmin']:
             raise ConvError("Invalid fine Gmax range defined in .conv file")
     elif fgmmode == 'none':
@@ -1127,11 +1185,14 @@ def compile_cmd_line(jname):
 
     return cmd_line, stdin_file, stdout_file
 
+
 ###### -- MAIN PROGRAM -- ######
 if __name__ == '__main__':
 
-    if (sys.version_info[0] < 2 or (sys.version_info[0] == 2 and sys.version_info[1] < 6)):
-        sys.exit("ERROR - Python version 2.6 or higher required to run the script")
+    if (sys.version_info[0] < 2 or (sys.version_info[0] == 2 and
+                                    sys.version_info[1] < 6)):
+        sys.exit("ERROR - Python version 2.6 or higher required "
+                 "to run the script")
 
     print "CASTEPconv v. " + __vers_number__ + "\n"
     print "by Simone Sturniolo"
@@ -1150,7 +1211,8 @@ if __name__ == '__main__':
     try:
         job_convfile = open(seedname + ".conv", 'r')
     except IOError:
-        print __WARNING__ + ": - Convergence parameter file for job " + seedname + " not found. Using default parameters"
+        print(__WARNING__ + ": - Convergence parameter file for job " +
+              seedname + " not found. Using default parameters")
         job_convfile = None
 
     if job_convfile is not None:
@@ -1181,14 +1243,16 @@ if __name__ == '__main__':
     try:
         stripped_param = strip_paramfile(seedname + ".param")
     except io_freeform_error:
-        print(__WARNING__ + " - .param file for job " + seedname + " not found")
+        print(__WARNING__ + " - .param file for job " + seedname +
+              " not found")
         stripped_param = io_freeform_file()
 
     # Override task in .conv file with command line options
 
     if cmdline_task is not None:
         str_par_vals['ctsk'] = {'c': 'clear', 'i': 'input',
-                                'ir': 'inputrun', 'o': 'output', 'a': 'all'}[cmdline_task]
+                                'ir': 'inputrun', 'o': 'output',
+                                'a': 'all'}[cmdline_task]
 
     try:
         assert(str_par_vals['ctsk'] in (
@@ -1215,8 +1279,13 @@ if __name__ == '__main__':
         # Create a list of files to delete
         to_del_suffixes = [".conv_tab", "_report.txt",
                            "_cut_conv.dat", "_kpn_conv.dat", "_fgm_conv.dat",
-                           "_cut_conv.gp",  "_kpn_conv.gp", "_fgm_conv.gp",   "_cut_str_conv.gp",  "_kpn_str_conv.gp",  "_fgm_str_conv.gp",
-                           "_cut_conv.agr", "_kpn_conv.agr", "_fgm_conv.agr", "_cut_str_conv.agr", "_kpn_str_conv.agr", "_fgm_str_conv.agr"]   # A list of all possible files to delete
+                           "_cut_conv.gp",  "_kpn_conv.gp", "_fgm_conv.gp",
+                           "_cut_str_conv.gp",  "_kpn_str_conv.gp",
+                           "_fgm_str_conv.gp",
+                           "_cut_conv.agr", "_kpn_conv.agr", "_fgm_conv.agr",
+                           "_cut_str_conv.agr", "_kpn_str_conv.agr",
+                           "_fgm_str_conv.agr"]
+        # A list of all possible files to delete
 
         to_del_files = []
 
@@ -1274,19 +1343,22 @@ if __name__ == '__main__':
         if str_par_vals["subs"] is not None:
 
             if not os.path.isfile(str_par_vals["subs"]):
-                print __WARNING__ + ": submission script " + str_par_vals["subs"] + " not found, skipping"
+                print(__WARNING__ + ": submission script " +
+                      str_par_vals["subs"] + " not found, skipping")
             else:
                 sscript = open(str_par_vals["subs"], 'r').readlines()
                 # Sanity check
                 has_seed = any(['<seedname>' in l for l in sscript])
                 if not has_seed:
-                    print(__WARNING__ + ": submission script does not contain a <seedname> tag.\n"
+                    print(__WARNING__ + ": submission script does not contain"
+                          " a <seedname> tag.\n"
                           "This is likely erroneous. Please check.\n")
 
         # Apply displacements to .cell atoms if needed to have non-zero forces
 
         if float_par_vals["displ"] > 0.0:
-            print "Displacing atoms in .cell file of " + str(float_par_vals["displ"]) + " Angstroms"
+            print("Displacing atoms in .cell file of " +
+                  str(float_par_vals["displ"]) + " Angstroms")
             try:
                 stripped_cell = displace_cell_atoms(
                     stripped_cell, abc_len, float_par_vals["displ"])
@@ -1310,7 +1382,9 @@ if __name__ == '__main__':
 
         if os.path.isfile(seedname + ".conv_tab") and not ovwrite_files:
             to_del = raw_input(__WARNING__ + ": " + seedname +
-                               ".conv_tab already exists. This file will be overwritten. Continue (y/N/y-all)?")
+                               ".conv_tab already exists. "
+                               "This file will be overwritten."
+                               " Continue (y/N/y-all)?")
             if to_del.lower() == 'y-all':
                 ovwrite_files = True
             elif to_del.lower() != 'y':
@@ -1318,24 +1392,32 @@ if __name__ == '__main__':
 
         conv_tab_file = open(seedname + ".conv_tab", 'w')
 
-        if (float_par_vals["cutmin"] <= 0.0 or float_par_vals["cutstep"] <= 0.0 or float_par_vals["cutmax"] < float_par_vals["cutmin"]):
+        if (float_par_vals["cutmin"] <= 0.0 or
+            float_par_vals["cutstep"] <= 0.0 or
+                float_par_vals["cutmax"] < float_par_vals["cutmin"]):
             sys.exit("ERROR - Invalid cutoff range defined in .conv file")
-        if (int_par_vals["kpnmin"] <= 0 or int_par_vals["kpnstep"] <= 0 or int_par_vals["kpnmax"] < int_par_vals["kpnmin"]):
+        if (int_par_vals["kpnmin"] <= 0 or
+            int_par_vals["kpnstep"] <= 0 or
+                int_par_vals["kpnmax"] < int_par_vals["kpnmin"]):
             sys.exit("ERROR - Invalid k-points range defined in .conv file")
 
         cut_n = int(math.ceil(float_par_vals[
-                    "cutmax"]-float_par_vals["cutmin"])/float_par_vals["cutstep"])+1
+                    "cutmax"]-float_par_vals["cutmin"]) /
+                    float_par_vals["cutstep"])+1
         cutrange = [float_par_vals["cutmin"] + i *
                     float_par_vals["cutstep"] for i in range(0, cut_n)]
 
         kpn_n = int(math.ceil(
-            int_par_vals["kpnmax"]-int_par_vals["kpnmin"])/int_par_vals["kpnstep"])+1
-        kpnrange = [tuple([int((int_par_vals["kpnmin"] + i * int_par_vals["kpnstep"]) * e)
+            int_par_vals["kpnmax"]-int_par_vals["kpnmin"]) /
+            int_par_vals["kpnstep"])+1
+        kpnrange = [tuple([int((int_par_vals["kpnmin"] +
+                                i * int_par_vals["kpnstep"]) * e)
                            for e in kpn_base]) for i in range(0, kpn_n)]
 
         if (str_par_vals["fgmmode"] is not None):
             fgm_n = int(math.ceil(float_par_vals[
-                        "fgmmax"]-float_par_vals["fgmmin"])/float_par_vals["fgmstep"])+1
+                        "fgmmax"]-float_par_vals["fgmmin"]) /
+                        float_par_vals["fgmstep"])+1
             fgmrange = [float_par_vals["fgmmin"] + i *
                         float_par_vals["fgmstep"] for i in range(0, fgm_n)]
         else:
@@ -1356,9 +1438,11 @@ if __name__ == '__main__':
         for kpn in kpnrange[1:]:
             conv_tab_file.write(kgrid(kpn) + "\t|\t")
             allrange.append(
-                {'cut': cutrange[0], 'kpn': kpn, 'fgm': fgmrange[0], 'scan': 'kpn'})
+                {'cut': cutrange[0], 'kpn': kpn,
+                 'fgm': fgmrange[0], 'scan': 'kpn'})
         conv_tab_file.write(
-            "\nfine_gmax:\t" + (str(fgmrange[0]) + " eV\t" if fgmrange[0] is not None else "N/A"))
+            "\nfine_gmax:\t" + (str(fgmrange[0]) + " eV\t"
+                                if fgmrange[0] is not None else "N/A"))
         for fgm in fgmrange[1:]:
             conv_tab_file.write(str(fgm) + " eV\t")
             allrange.append({'cut': fgm_cutoff, 'kpn': kpnrange[
@@ -1390,8 +1474,10 @@ if __name__ == '__main__':
             if not os.path.exists(foldname):
                 os.makedirs(foldname)
             elif not ovwrite_files:
-                to_del = raw_input(__WARNING__ + ": folder " + foldname + " already exists. "
-                                   "\nSome files might be overwritten. Continue (y/N/y-all)?")
+                to_del = raw_input(__WARNING__ + ": folder " + foldname +
+                                   " already exists. "
+                                   "\nSome files might be overwritten. "
+                                   "Continue (y/N/y-all)?")
                 if to_del.lower() == 'y-all':
                     ovwrite_files = True
                 elif to_del.lower() != 'y':
@@ -1477,26 +1563,34 @@ if __name__ == '__main__':
                     open(seedname + ".conv_tab", 'r'))
             else:
                 cut_n = int(math.ceil(float_par_vals[
-                            "cutmax"]-float_par_vals["cutmin"])/float_par_vals["cutstep"])+1
+                            "cutmax"]-float_par_vals["cutmin"]) /
+                            float_par_vals["cutstep"])+1
                 cutrange = [float_par_vals["cutmin"] + i *
-                            float_par_vals["cutstep"] for i in range(0, cut_n)]
+                            float_par_vals["cutstep"]
+                            for i in range(0, cut_n)]
 
                 kpn_n = int(math.ceil(
-                    int_par_vals["kpnmax"]-int_par_vals["kpnmin"])/int_par_vals["kpnstep"])+1
-                kpnrange = [tuple([int((int_par_vals["kpnmin"] + i * int_par_vals["kpnstep"]) * e)
-                                   for e in kpn_base]) for i in range(0, kpn_n)]
+                    int_par_vals["kpnmax"]-int_par_vals["kpnmin"]) /
+                    int_par_vals["kpnstep"])+1
+                kpnrange = [tuple([int((int_par_vals["kpnmin"] +
+                                        i * int_par_vals["kpnstep"]) * e)
+                                   for e in kpn_base])
+                            for i in range(0, kpn_n)]
 
                 if (str_par_vals["fgmmode"] is not None):
                     fgm_n = int(math.ceil(float_par_vals[
-                                "fgmmax"]-float_par_vals["fgmmin"])/float_par_vals["fgmstep"])+1
+                                "fgmmax"]-float_par_vals["fgmmin"]) /
+                                float_par_vals["fgmstep"])+1
                     fgmrange = [float_par_vals["fgmmin"] + i *
-                                float_par_vals["fgmstep"] for i in range(0, fgm_n)]
+                                float_par_vals["fgmstep"]
+                                for i in range(0, fgm_n)]
                 else:
                     fgmrange = [None]
 
         if (len(cutrange) + len(kpnrange) + len(fgmrange) == 0):
             sys.exit(
-                "ERROR - Corrupted .conv_tab file. Output task can not be carried out")
+                "ERROR - Corrupted .conv_tab file. "
+                "Output task can not be carried out")
 
         calc_str = bool_par_vals["cnvstr"]
         conv_fgm = (str_par_vals["fgmmode"] is not None)
@@ -1510,7 +1604,8 @@ if __name__ == '__main__':
                                 0], 'fgm': fgmrange[0], 'scan': 'cut'})
             for kpn in kpnrange[1:]:
                 allrange.append(
-                    {'cut': cutrange[0], 'kpn': kpn, 'fgm': fgmrange[0], 'scan': 'kpn'})
+                    {'cut': cutrange[0], 'kpn': kpn, 'fgm': fgmrange[0],
+                     'scan': 'kpn'})
             for fgm in fgmrange[1:]:
                 allrange.append({'cut': fgm_cutoff, 'kpn': kpnrange[
                                 0], 'fgm': fgm, 'scan': 'fgm'})
@@ -1542,13 +1637,15 @@ if __name__ == '__main__':
             elif (str_par_vals["rmode"] == "parallel"):
                 foldname = jobname
             else:
-                sys.exit("ERROR - Invalid value for the running_mode parameter")
+                sys.exit("ERROR - Invalid value for "
+                         "the running_mode parameter")
 
             filepath = os.path.join(foldname, jobname + '.castep')
 
             if not os.path.isfile(filepath):
                 sys.exit("ERROR - File " + filepath +
-                         " not found. Please check the .conv file and that all calculations have actually finished")
+                         " not found. Please check the .conv file and "
+                         "that all calculations have actually finished")
 
             castepfile = open(filepath, 'r').readlines()
 
@@ -1559,16 +1656,22 @@ if __name__ == '__main__':
 
             atom_n = castep_data['atom_n']
 
-            if castep_data['cut'] is None or castep_data['kpn'] is None or castep_data['cut'] != cut or castep_data['kpn'] != kpn:
+            if (castep_data['cut'] is None or castep_data['kpn'] is None or
+                    castep_data['cut'] != cut or castep_data['kpn'] != kpn):
                 sys.exit("ERROR - Simulation parameters in " +
                          filepath + " do not correspond to expected values")
 
-            if conv_fgm and (castep_data['fgm'] is None or castep_data['fgm'] != round_digits(cut_to_k(fgm), 4)):
+            if (conv_fgm and (castep_data['fgm'] is None or
+                              castep_data['fgm'] != round_digits(cut_to_k(fgm),
+                                                                 4))):
                 if scan in ('fgm', 'kpn'):
                     sys.exit("ERROR - Simulation parameters in " +
-                             filepath + " do not correspond to expected values")
+                             filepath + " do not correspond to "
+                             "expected values")
                 else:
-                    print __WARNING__ + " - fine_Gmax value used in " + filepath + " is greater than the set value of fine_gmax_min due to the higher cutoff"
+                    print(__WARNING__ + " - fine_Gmax value used in " +
+                          filepath + " is greater than the set value of "
+                          "fine_gmax_min due to the higher cutoff")
 
             if castep_data['nrg'] is None or castep_data['for'] is None:
                 sys.exit("ERROR - Incomplete simulation results in " +
@@ -1616,33 +1719,49 @@ if __name__ == '__main__':
         # Save the results in data files
 
         cutfile = open(seedname + "_cut_conv.dat", 'w')
-        cutfile.write("Cutoff (eV)\tEnergy (eV)\tEnergy/Atom (eV)\tForces (eV/A)" +
+        cutfile.write("Cutoff (eV)\tEnergy (eV)\tEnergy/Atom (eV)\t"
+                      "Forces (eV/A)" +
                       ("\tTotal stresses (GPa)" if calc_str else "") + "\n")
 
         for i in range(0, len(cutrange)):
-            cutfile.write(str(cutrange[i]) + '\t\t' + str(cutnrg[i]) + '\t\t' + str(cutnrg[i]/atom_n) +
-                          '\t\t' + str(cutfor[i]) + ('\t\t' + str(cutstr[i]) if calc_str else '') + '\n')
+            cutfile.write(str(cutrange[i]) + '\t\t' + str(cutnrg[i]) +
+                          '\t\t' + str(cutnrg[i]/atom_n) +
+                          '\t\t' + str(cutfor[i]) + ('\t\t' + str(cutstr[i])
+                                                     if calc_str else '') +
+                          '\n')
 
         cutfile.close()
 
         kpnfile = open(seedname + "_kpn_conv.dat", 'w')
-        kpnfile.write("kpoints (tot)\tEnergy (eV)\tEnergy/Atom (eV)\tForces (eV/A)" +
+        kpnfile.write("kpoints (tot)\tEnergy (eV)\tEnergy/Atom (eV)\t"
+                      "Forces (eV/A)" +
                       ("\tTotal stresses (GPa)" if calc_str else "") + "\n")
 
         for i in range(0, len(kpnrange)):
-            kpnfile.write(str(kpnrange[i][0]*kpnrange[i][1]*kpnrange[i][2]) + '\t\t' + str(kpnnrg[i]) + '\t\t' + str(kpnnrg[i]/atom_n) + '\t\t' +
-                          str(kpnfor[i]) + ('\t\t' + str(kpnstr[i]) if calc_str else '') + '\n')
+            kpnfile.write(str(kpnrange[i][0]*kpnrange[i][1]*kpnrange[i][2]) +
+                          '\t\t' + str(kpnnrg[i]) + '\t\t' +
+                          str(kpnnrg[i]/atom_n) + '\t\t' +
+                          str(kpnfor[i]) + ('\t\t' + str(kpnstr[i])
+                                            if calc_str else '') +
+                          '\n')
 
         kpnfile.close()
 
         if (conv_fgm):
             fgmfile = open(seedname + "_fgm_conv.dat", 'w')
-            fgmfile.write("Fine Gmax (eV)\tEnergy (eV)\tEnergy/Atom (eV)\t\tMax force (eV/A)" +
-                          ("\tTotal stress (GPa)" if calc_str else "") + "\tFine Gmax (1/A)\n")
+            fgmfile.write("Fine Gmax (eV)\tEnergy (eV)\tEnergy/Atom (eV)\t\t"
+                          "Max force (eV/A)" +
+                          ("\tTotal stress (GPa)" if calc_str else "") +
+                          "\tFine Gmax (1/A)\n")
 
             for i in range(0, len(fgmrange)):
-                fgmfile.write(str(fgmrange[i]) + '\t\t' + str(fgmnrg[i]) + '\t\t' + str(fgmnrg[i]/atom_n) + '\t\t' +
-                              str(fgmfor[i]) + ('\t\t' + str(fgmstr[i]) if calc_str else '') + '\t\t' + str(round_digits(cut_to_k(fgmrange[i]), 4)) + '\n')
+                fgmfile.write(str(fgmrange[i]) + '\t\t' + str(fgmnrg[i]) +
+                              '\t\t' + str(fgmnrg[i]/atom_n) + '\t\t' +
+                              str(fgmfor[i]) + ('\t\t' + str(fgmstr[i])
+                                                if calc_str else '') + '\t\t' +
+                              str(round_digits(cut_to_k(fgmrange[i]),
+                                               4)) +
+                              '\n')
 
             fgmfile.close()
 

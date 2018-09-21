@@ -626,7 +626,7 @@ def parse_stresses(cfile):
 # Parse a .castep file as a whole
 
 
-def parse_castep_file(cfile, filepath):
+def parse_castep_file(castepfile, filepath):
 
     global bool_par_vals, has_fix_occ
     global __CASTEP_ATOMN__, __CASTEP_CUTOFF__, __CASTEP_ENERGY_FIX__

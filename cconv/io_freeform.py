@@ -5,10 +5,16 @@ It is heavily inspired in its interface to the original io module but the code
 is written from scratch and uses a more object-oriented approach
 """
 
+# Python 2-to-3 compatibility code
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+from __future__ import unicode_literals
+
 import re
 import collections
 import copy
-from units import phys_units, default_units
+from cconv.units import phys_units, default_units
 
 
 class IOKeywordError(Exception):
@@ -692,10 +698,3 @@ class IOFreeformFile(object):
             printed_file += "\n"
 
         return printed_file
-
-
-if __name__ == "__main__":
-
-    f = io_freeform_file()
-
-    print f.freeform_print()

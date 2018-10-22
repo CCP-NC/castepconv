@@ -8,10 +8,10 @@
 # License (GNU GPL)
 
 # Python 2-to-3 compatibility code
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-from __future__ import unicode_literals
+# from __future__ import absolute_import
+# from __future__ import division
+# from __future__ import print_function
+# from __future__ import unicode_literals
 
 import sys
 import time
@@ -26,7 +26,7 @@ import subprocess as sp
 from collections import namedtuple
 
 from cconv.graphs import gp_graph, agr_graph
-from cconv.io_freeform import IOFreeformFile, IOFreeformError
+from cconv.io_freeform import io_freeform_file, io_freeform_error
 
 __vers_number__ = "1.0.2"
 
@@ -354,7 +354,7 @@ def parse_conv_tab_file(cfile):
 
 def strip_cellfile(fname):
 
-    stripped = IOFreeformFile(fname)
+    stripped = io_freeform_file(fname)
 
     # Parse/remove all undesired blocks
 
@@ -475,7 +475,7 @@ def strip_paramfile(fname):
 
     global bool_par_vals, has_fix_occ
 
-    stripped = IOFreeformFile(fname)
+    stripped = io_freeform_file(fname)
 
     # Is occupancy fixed?
     if stripped.freeform_present('fix_occupancy'):
@@ -874,10 +874,10 @@ def create_conv_folder(foldname, jobname, cut, kpn, fgm, prev_jobname=None):
         os.makedirs(foldname)
     elif (not ovwrite_files and len(os.listdir(foldname)) > 0 and
           prev_jobname is None):
-        to_del = eval(input(__WARNING__ + ": folder " + foldname +
+        to_del = input(__WARNING__ + ": folder " + foldname +
                            " already exists. \n"
                            "Some files might be overwritten. "
-                           "Continue (y/N/y-all)?"))
+                           "Continue (y/N/y-all)?")
         if to_del.lower() == 'y-all':
             ovwrite_files = True
         elif to_del.lower() != 'y':
@@ -1032,7 +1032,7 @@ def create_pseudopots(seedname, pseudo_pots, tmp):
                   open(os.path.join(tmp,
                                     seedname + '.castep')).readlines()[-9])
     except IOError:
-        print((__WARNING__ + ": dryrun failed"))
+        print(__WARNING__ + ": dryrun failed")
 
     # Ok, grab pseudopotentials
     if drfile:
@@ -1042,7 +1042,7 @@ def create_pseudopots(seedname, pseudo_pots, tmp):
             el = bname.split('_')[0]
             pseudo_pots.append(PPotEntry(el, ppf, True))
     else:
-        print((__WARNING__ + ": dryrun failed"))
+        print(__WARNING__ + ": dryrun failed")
 
 
 # Find and if needed copy the pseudo potential files
@@ -1089,10 +1089,10 @@ def find_pseudopots(seedname, pseudo_pots):
                 if not os.path.exists(pp_folder):
                     os.makedirs(pp_folder)
                 elif not ovwrite_files:
-                    to_del = eval(input(__WARNING__ + ": folder " + pp_folder +
+                    to_del = input(__WARNING__ + ": folder " + pp_folder +
                                        " already exists.\n"
                                        "Some files might be overwritten. "
-                                       "Continue (y/N/y-all)?"))
+                                       "Continue (y/N/y-all)?")
                     if to_del.lower() == 'y-all':
                         ovwrite_files = True
                     elif to_del.lower() != 'y':
@@ -1200,7 +1200,7 @@ if __name__ == '__main__':
         sys.exit("ERROR - Python version 2.6 or higher required "
                  "to run the script")
 
-    print(("CASTEPconv v. " + __vers_number__ + "\n"))
+    print("CASTEPconv v. " + __vers_number__ + "\n")
     print("by Simone Sturniolo")
     print("Copyright 2014 Science and Technology Facilities Council\n")
 
@@ -1212,7 +1212,7 @@ if __name__ == '__main__':
     # PHASE 0 - Check for existence of all required files and read the
     # necessary information
 
-    print(("Reading " + seedname + ".conv"))
+    print("Reading " + seedname + ".conv")
 
     try:
         job_convfile = open(seedname + ".conv", 'r')
@@ -1231,14 +1231,14 @@ if __name__ == '__main__':
 
     if (str_par_vals['ctsk'] != "output"):
 
-        print(("Reading " + seedname + ".cell"))
+        print("Reading " + seedname + ".cell")
 
         try:
             assert os.path.isfile(seedname + ".cell")
         except AssertionError:
             sys.exit("ERROR - .cell file for job " + seedname + " not found")
 
-        print(("Reading " + seedname + ".param"))
+        print("Reading " + seedname + ".param")
 
     else:
         cellfile_lines = None
@@ -1248,10 +1248,10 @@ if __name__ == '__main__':
 
     try:
         stripped_param = strip_paramfile(seedname + ".param")
-    except IOFreeformError:
+    except io_freeform_error:
         print((__WARNING__ + " - .param file for job " + seedname +
               " not found"))
-        stripped_param = IOFreeformFile()
+        stripped_param = io_freeform_file()
 
     # Override task in .conv file with command line options
 
@@ -1314,7 +1314,7 @@ if __name__ == '__main__':
         if ((len(to_del_fold) + len(to_del_files)) == 0):
             print("No folders or files to delete found")
         else:
-            to_del = eval(input("Continue (y/N)?"))
+            to_del = input("Continue (y/N)?")
 
             if to_del.lower() == 'y':
 
@@ -1387,10 +1387,10 @@ if __name__ == '__main__':
         # Will be read if output is done as a separate operation
 
         if os.path.isfile(seedname + ".conv_tab") and not ovwrite_files:
-            to_del = eval(input(__WARNING__ + ": " + seedname +
+            to_del = input(__WARNING__ + ": " + seedname +
                                ".conv_tab already exists. "
                                "This file will be overwritten."
-                               " Continue (y/N/y-all)?"))
+                               " Continue (y/N/y-all)?")
             if to_del.lower() == 'y-all':
                 ovwrite_files = True
             elif to_del.lower() != 'y':
@@ -1472,7 +1472,7 @@ if __name__ == '__main__':
 
             foldname = seedname + "_conv"
 
-            print(("Creating folder " + foldname + " for serial convergence run"))
+            print("Creating folder " + foldname + " for serial convergence run")
 
             # Check whether the folder exists from previous jobs or you're just
             # creating it now...
@@ -1480,10 +1480,10 @@ if __name__ == '__main__':
             if not os.path.exists(foldname):
                 os.makedirs(foldname)
             elif not ovwrite_files:
-                to_del = eval(input(__WARNING__ + ": folder " + foldname +
+                to_del = input(__WARNING__ + ": folder " + foldname +
                                    " already exists. "
                                    "\nSome files might be overwritten. "
-                                   "Continue (y/N/y-all)?"))
+                                   "Continue (y/N/y-all)?")
                 if to_del.lower() == 'y-all':
                     ovwrite_files = True
                 elif to_del.lower() != 'y':

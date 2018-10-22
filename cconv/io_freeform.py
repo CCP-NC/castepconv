@@ -152,19 +152,15 @@ class IOFreeformFile(object):
 
         # First, check that the keywords argument is valid, and open the file
 
-        if type(fname) is not str:
+        try:
+            filelines = open(fname, 'r').readlines()
+        except IOError:
             raise IOFreeformError(
-                "Invalid fname argument passed to io_freeform_load")
-        else:
-            try:
-                filelines = open(fname, 'r').readlines()
-            except IOError:
-                raise IOFreeformError(
-                    "File " + fname + " passed to io_freeform_load not found")
+                "File " + fname + " passed to freeform_load not found")
 
         if keywords is not None:
-            if type(keywords) is not list or not all([type(k) is Keyword
-                                                      for k in keywords]):
+            if (not hasattr(keywords, '__iter__') or
+                    not all([type(k) is Keyword for k in keywords])):
                 raise IOFreeformError(
                     "Invalid keywords argument passed to io_freeform_load")
             else:

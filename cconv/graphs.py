@@ -6,6 +6,20 @@ _y_types = {'nrg': 'Final energy (eV/Atom)',
             'for': 'Maximum force ({scale} ev/Ang)',
             'str': 'Maximum stress ({scale} GPa)'}
 
+# Templates for printing
+_gp_template = """
+set xlabel "{xlabel}"\n
+set ylabel "Deviation"
+set xtics nomirror
+set xtics ({xtics}) {xticspos}
+set ytics nomirror
+plot {plotlines} 0 lt 0 lc 0 notitle
+pause -1 "Hit return to continue"
+"""
+
+_gp_plot_template = ('"{file_seed}.dat" using 1:((${col}-({ref}))*{scale})'
+                     ' with linespoints pt 7 lc {lc} ti "{legend}",')
+
 
 def find_scale(data):
     # Find common scales for the residuals of the given data
@@ -56,20 +70,15 @@ def gp_graph(seedname, data, cnvstr=False):
             continue
         out_file = open(file_seed + '.gp', 'w')
 
-        out_file.write('set xlabel "{xlabel}"\n'.format(xlabel=xlabel))
-        out_file.write('set ylabel "Deviation"\n')
-        out_file.write('set xtics nomirror\n')
+        # X Tics
+        xtics = ', '.join(['"{0}" {1}'.format(rs, r)
+                           for r, rs in zip(data[x]['range'],
+                                            data[x]['rangestr'])])
+        xticspos = 'rotate by 45 right' if x == 'kpn' else ''
 
-        # Set the tics specially in case of k-points
-        if x == 'kpn':
-            out_file.write('set xtics (' +
-                           ', '.join(['"{0}" {1}'.format(rs, r)
-                                      for r, rs in zip(data[x]['range'],
-                                                       data[x]['rangestr'])]) +
-                           ') rotate by 45 right\n')
+        # Individual line plots
+        plotlines = ''
 
-        out_file.write('set ytics nomirror\n')
-        out_file.write('plot ')
         for y, legend in _y_types.iteritems():
 
             if y == 'str' and not cnvstr:
@@ -77,19 +86,19 @@ def gp_graph(seedname, data, cnvstr=False):
 
             scale = scales[x][y]
             lsc = '10^{{{0}}}'.format(-int(log10(scale)))
-            out_file.write(('"{file_seed}.dat" using '
-                            '1:((${col}-({ref}))*{scale})'
-                            ' with linespoints pt 7 lc {lc} '
-                            'ti "{legend}",').format(file_seed=file_seed,
-                                                     scale=scale,
-                                                     legend=legend.format(
-                                                         scale=lsc),
-                                                     ref=data[x][y][-1],
-                                                     **plot_details[y])
-                           )
-        out_file.write(' 0 lt 0 lc 0 notitle\n')
 
-        out_file.write('pause -1 "Hit return to continue"\n')
+            plotlines += _gp_plot_template.format(file_seed=file_seed,
+                                                   scale=scale,
+                                                   legend=legend.format(
+                                                       scale=lsc),
+                                                   ref=data[x][y][-1],
+                                                   **plot_details[y])
+
+        out_file.write(_gp_template.format(xlabel=xlabel,
+                                           xtics=xtics,
+                                           xticspos=xticspos,
+                                           plotlines=plotlines))
+
         out_file.close()
 
 

@@ -54,6 +54,27 @@ class CConvTests(unittest.TestCase):
                 ioff = IOFreeformFile(tmp.name, keywords=[
                     Keyword('keyw', 'S:B')])
 
+    def test_gnuplot(self):
+
+        from cconv.graphs import gp_graph
+
+        # Fake data
+        data = {
+            'cut': {
+                'range': [300, 400, 500],
+                'nrg': [4, 2, 1]
+            },
+            'kpn': {
+                'range': [(1,1,1), (2,2,2), (3,3,3)],
+                'nrg': [4, 2, 1]            
+            },
+            'fgm': {
+                'range': []
+            }
+        }
+
+        gp_graph('test', data)
+
 
 if __name__ == "__main__":
     unittest.main()

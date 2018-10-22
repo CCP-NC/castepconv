@@ -1,3 +1,9 @@
+# Python 2-to-3 compatibility code
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+from __future__ import unicode_literals
+
 import os
 from math import log10, floor
 
@@ -36,7 +42,7 @@ def find_scale(data):
               for y in _y_types}
         # Proposed scaling factors
         scales[x] = {y: 10**floor(log10(Ms['nrg']/m)) if m > 0 else 1
-                     for y, m in Ms.iteritems()}
+                     for y, m in Ms.items()}
 
     return scales
 
@@ -62,7 +68,7 @@ def gp_graph(seedname, data, cnvstr=False):
     }
     }
 
-    for x, xlabel in _x_types.iteritems():
+    for x, xlabel in _x_types.items():
 
         # Check if source .dat file exists
         file_seed = '{seedname}_{x}_conv'.format(seedname=seedname, x=x)
@@ -79,7 +85,7 @@ def gp_graph(seedname, data, cnvstr=False):
         # Individual line plots
         plotlines = ''
 
-        for y, legend in _y_types.iteritems():
+        for y, legend in _y_types.items():
 
             if y == 'str' and not cnvstr:
                 continue
@@ -88,11 +94,11 @@ def gp_graph(seedname, data, cnvstr=False):
             lsc = '10^{{{0}}}'.format(-int(log10(scale)))
 
             plotlines += _gp_plot_template.format(file_seed=file_seed,
-                                                   scale=scale,
-                                                   legend=legend.format(
-                                                       scale=lsc),
-                                                   ref=data[x][y][-1],
-                                                   **plot_details[y])
+                                                  scale=scale,
+                                                  legend=legend.format(
+                                                      scale=lsc),
+                                                  ref=data[x][y][-1],
+                                                  **plot_details[y])
 
         out_file.write(_gp_template.format(xlabel=xlabel,
                                            xtics=xtics,
@@ -123,7 +129,7 @@ def agr_graph(seedname, data, cnvstr=False):
     }
     }
 
-    for x, xname in _x_types.iteritems():
+    for x, xname in _x_types.items():
 
         if x == 'fgm' and len(data[x]['nrg']) == 0:
             # No fine grid convergence was performed
@@ -177,7 +183,7 @@ def agr_graph(seedname, data, cnvstr=False):
                            str(data[x]['step']) + '\n')
         out_file.write('@    xaxis offset 0.0, 1.0\n')
 
-        for y, legend in _y_types.iteritems():
+        for y, legend in _y_types.items():
             if y == 'str' and not cnvstr:
                 continue
 
@@ -185,7 +191,7 @@ def agr_graph(seedname, data, cnvstr=False):
 
             y1 = data[x][y]
             set_header = '@    s{set}'.format(**plot_details[y])
-            lsc = legend.format(scale='10\S{0}\N'.format(
+            lsc = legend.format(scale='10\\S{0}\\N'.format(
                 -int(log10(scales[x][y]))))
 
             out_file.write("""

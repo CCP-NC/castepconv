@@ -11,15 +11,15 @@ import copy
 from units import phys_units, default_units
 
 
-class io_keyword_error(Exception):
+class IOKeywordError(Exception):
     pass
 
 
-class io_freeform_error(Exception):
+class IOFreeformError(Exception):
     pass
 
 
-class keyword(object):
+class Keyword(object):
     """Keyword class - defines a keyword to be used when parsing a freeform
     file
 
@@ -60,28 +60,21 @@ class keyword(object):
 
     def __init__(self, key, typ, description=''):
 
-        # Check that arguments are ok
-        if type(key) is not str:
-            raise io_keyword_error("Invalid key argument passed to keyword")
-        else:
-            self.key = key
+        self.key = str(key)
 
         try:
-            typmatch = re.findall('(S|I|R|P|D|L|V|W|B):(B|I|E|D)', typ.upper())
-            if len(typmatch) != 1:
+            typmatch = re.match('(S|I|R|P|D|L|V|W|B)(?::(B|I|E|D))*',
+                                typ.upper())
+            if typmatch is None:
                 raise TypeError()
             else:
                 self.typ = typ
-                self.vtyp = typmatch[0][0]
-                self.ltyp = typmatch[0][1]
+                self.vtyp = typmatch.groups()[0]
+                self.ltyp = typmatch.groups()[1]
         except TypeError:
-            raise io_keyword_error("Invalid typ argument passed to keyword")
+            raise IOKeywordError("Invalid typ argument passed to keyword")
 
-        if type(description) is not str:
-            raise io_keyword_error(
-                "Invalid description argument passed to keyword")
-        else:
-            self.description = description
+        self.description = str(description)
 
 
 def io_unit_to_atomic(val, units):
@@ -98,7 +91,7 @@ def io_unit_to_default(val, units):
                 phys_units[default_units[dim]]['value'])
 
 
-class io_freeform_file(object):
+class IOFreeformFile(object):
     """IO freeform file class - opens and loads the contents of a file defined
        by the freeform format.
 
@@ -118,7 +111,7 @@ class io_freeform_file(object):
                                                 the file. If not present, all
                                                 keywords will be accepted
 
-        Raises a io_freeform_error if an invalid keyword is present or if
+        Raises a IOFreeformError if an invalid keyword is present or if
         blocks are not properly defined.
         """
 
@@ -147,26 +140,26 @@ class io_freeform_file(object):
                                                 the file. If not present, all
                                                 keywords will be accepted
 
-        Raises a io_freeform_error if an invalid keyword is present or if
+        Raises a IOFreeformError if an invalid keyword is present or if
         blocks are not properly defined.
         """
 
         # First, check that the keywords argument is valid, and open the file
 
         if type(fname) is not str:
-            raise io_freeform_error(
+            raise IOFreeformError(
                 "Invalid fname argument passed to io_freeform_load")
         else:
             try:
                 filelines = open(fname, 'r').readlines()
             except IOError:
-                raise io_freeform_error(
+                raise IOFreeformError(
                     "File " + fname + " passed to io_freeform_load not found")
 
         if keywords is not None:
-            if type(keywords) is not list or not all([type(k) is keyword
+            if type(keywords) is not list or not all([type(k) is Keyword
                                                       for k in keywords]):
-                raise io_freeform_error(
+                raise IOFreeformError(
                     "Invalid keywords argument passed to io_freeform_load")
             else:
                 self.keywords = {}
@@ -208,7 +201,7 @@ class io_freeform_file(object):
             if read_block:
                 if lsplit[0].upper() == '%ENDBLOCK':
                     if len(lsplit) == 1 or lsplit[1].upper() != keyw:
-                        raise io_freeform_error(
+                        raise IOFreeformError(
                             "Out of place end of block at line "
                             "{0} in io_freeform_file".format(i))
                     else:
@@ -222,7 +215,7 @@ class io_freeform_file(object):
                 read_block = (lsplit[0].upper() == '%BLOCK')
                 if read_block:
                     if len(lsplit) == 1:
-                        raise io_freeform_error(
+                        raise IOFreeformError(
                             "Unrecognizable block at line "
                             "{0} in io_freeform_file".format(i))
                     else:
@@ -233,19 +226,19 @@ class io_freeform_file(object):
                 # Is the keyword admissible?
                 if self.keywords is not None:
                     if keyw not in self.keywords:
-                        raise io_freeform_error(
+                        raise IOFreeformError(
                             "Unrecognizable keyword " + keyw + " at line "
                             "{0} in io_freeform_file".format(i))
                     # Is it, correctly, a block?
                     if read_block and self.keywords[keyw].vtyp != 'B':
-                        raise io_freeform_error(
+                        raise IOFreeformError(
                             "Unrecognizable block " + keyw + " at line "
                             "{0} in io_freeform_file".format(i))
 
                 # Is the keyword duplicated?
 
                 if keyw in self.keyvals:
-                    raise io_freeform_error(
+                    raise IOFreeformError(
                         "Duplicated keyword " + keyw + " at line "
                         "{0} in io_freeform_file".format(i))
 
@@ -289,13 +282,13 @@ class io_freeform_file(object):
             try:
                 assert self.keywords[key.upper()].vtyp == 'S'
             except (KeyError, AssertionError):
-                raise io_freeform_error(
+                raise IOFreeformError(
                     "Keyword " + key + " in io_freeform_file is not defined"
                     " as type String")
 
         if value is None:
             if not self.freeform_present(key):
-                raise io_freeform_error(
+                raise IOFreeformError(
                     "Keyword " + key + " not present in io_freeform_file")
         else:
             self.keyvals[key.upper()] = str(value)
@@ -321,13 +314,13 @@ class io_freeform_file(object):
             try:
                 assert self.keywords[key.upper()].vtyp == 'I'
             except (KeyError, AssertionError):
-                raise io_freeform_error(
+                raise IOFreeformError(
                     "Keyword " + key + " in io_freeform_file is not defined "
                     " as type Integer")
 
         if value is None:
             if not self.freeform_present(key):
-                raise io_freeform_error(
+                raise IOFreeformError(
                     "Keyword " + key + " not present in io_freeform_file")
         else:
             self.keyvals[key.upper()] = str(value)
@@ -335,7 +328,7 @@ class io_freeform_file(object):
         try:
             return int(self.keyvals[key.upper()])
         except ValueError:
-            raise io_freeform_error(
+            raise IOFreeformError(
                 "Invalid arguments for keyword " + key +
                 " in io_freeform_file")
 
@@ -358,13 +351,13 @@ class io_freeform_file(object):
             try:
                 assert self.keywords[key.upper()].vtyp == 'R'
             except (KeyError, AssertionError):
-                raise io_freeform_error(
+                raise IOFreeformError(
                     "Keyword " + key + " in io_freeform_file is not defined "
                     " as type Real")
 
         if value is None:
             if not self.freeform_present(key):
-                raise io_freeform_error(
+                raise IOFreeformError(
                     "Keyword " + key + " not present in io_freeform_file")
         else:
             self.keyvals[key.upper()] = str(value)
@@ -372,7 +365,7 @@ class io_freeform_file(object):
         try:
             return float(self.keyvals[key.upper()])
         except ValueError:
-            raise io_freeform_error(
+            raise IOFreeformError(
                 "Invalid arguments for keyword " + key +
                 " in io_freeform_file")
 
@@ -404,27 +397,27 @@ class io_freeform_file(object):
             try:
                 assert self.keywords[key.upper()].vtyp == 'P'
             except (KeyError, AssertionError):
-                raise io_freeform_error(
+                raise IOFreeformError(
                     "Keyword " + key + " in io_freeform_file is not defined "
                     " as type Physical")
 
         if dim not in default_units:
-            raise io_freeform_error(
+            raise IOFreeformError(
                 "Invalid dimension " + dim + " passed to freeform_physical")
 
         if unit is not None and unit not in phys_units:
-            raise io_freeform_error(
+            raise IOFreeformError(
                 "Invalid unit " + unit + " passed to freeform_physical")
 
         if value is None:
             if not self.freeform_present(key):
-                raise io_freeform_error(
+                raise IOFreeformError(
                     "Keyword " + key + " not present in io_freeform_file")
 
             rawvals = self.keyvals[key.upper()].split()
 
             if len(rawvals) > 2:
-                raise io_freeform_error(
+                raise IOFreeformError(
                     "Invalid arguments for keyword " + key +
                     " in io_freeform_file")
 
@@ -432,7 +425,7 @@ class io_freeform_file(object):
                 value = float(rawvals[0])
                 unit = rawvals[1] if len(rawvals) > 1 else default_units[dim]
             except ValueError:
-                raise io_freeform_error(
+                raise IOFreeformError(
                     "Invalid arguments for keyword " + key +
                     " in io_freeform_file")
         else:
@@ -447,7 +440,7 @@ class io_freeform_file(object):
             else:
                 return io_unit_to_default(value, unit)
         except ValueError:
-            raise io_freeform_error(
+            raise IOFreeformError(
                 "Invalid arguments for keyword " + key +
                 " in io_freeform_file")
 
@@ -470,7 +463,7 @@ class io_freeform_file(object):
             try:
                 assert self.keywords[key.upper()].vtyp == 'D'
             except (KeyError, AssertionError):
-                raise io_freeform_error(
+                raise IOFreeformError(
                     "Keyword " + key + " in io_freeform_file is not defined "
                     " as type Defined")
 
@@ -504,13 +497,13 @@ class io_freeform_file(object):
             try:
                 assert self.keywords[key.upper()].vtyp == 'L'
             except (KeyError, AssertionError):
-                raise io_freeform_error(
+                raise IOFreeformError(
                     "Keyword " + key + " in io_freeform_file is not defined"
                     " as type Logical")
 
         if value is None:
             if not self.freeform_present(key):
-                raise io_freeform_error(
+                raise IOFreeformError(
                     "Keyword " + key + " not present in io_freeform_file")
         else:
             self.keyvals[key.upper()] = {True: 'TRUE', False: 'FALSE'}[value]
@@ -519,7 +512,7 @@ class io_freeform_file(object):
             return {'TRUE': True, 'FALSE': False}[
                 self.keyvals[key.upper()].strip().upper()]
         except KeyError:
-            raise io_freeform_error(
+            raise IOFreeformError(
                 "Invalid arguments for keyword " + key +
                 " in io_freeform_file")
 
@@ -542,13 +535,13 @@ class io_freeform_file(object):
             try:
                 assert self.keywords[key.upper()].vtyp == 'V'
             except (KeyError, AssertionError):
-                raise io_freeform_error(
+                raise IOFreeformError(
                     "Keyword " + key + " in io_freeform_file is not defined "
                     " as type Real Vector")
 
         if value is None:
             if not self.freeform_present(key):
-                raise io_freeform_error(
+                raise IOFreeformError(
                     "Keyword " + key + " not present in io_freeform_file")
         else:
             try:
@@ -562,7 +555,7 @@ class io_freeform_file(object):
                 raise ValueError()
             return val
         except ValueError:
-            raise io_freeform_error(
+            raise IOFreeformError(
                 "Invalid arguments for keyword " + key +
                 " in io_freeform_file")
 
@@ -585,13 +578,13 @@ class io_freeform_file(object):
             try:
                 assert self.keywords[key.upper()].vtyp == 'W'
             except (KeyError, AssertionError):
-                raise io_freeform_error(
+                raise IOFreeformError(
                     "Keyword " + key + " in io_freeform_file is not defined"
                     " as type Integer Vector")
 
         if value is None:
             if not self.freeform_present(key):
-                raise io_freeform_error(
+                raise IOFreeformError(
                     "Keyword " + key + " not present in io_freeform_file")
         else:
             try:
@@ -605,7 +598,7 @@ class io_freeform_file(object):
                 raise ValueError()
             return val
         except ValueError:
-            raise io_freeform_error(
+            raise IOFreeformError(
                 "Invalid arguments for keyword " + key +
                 " in io_freeform_file")
 
@@ -629,13 +622,13 @@ class io_freeform_file(object):
             try:
                 assert self.keywords[key.upper()].vtyp == 'B'
             except (KeyError, AssertionError):
-                raise io_freeform_error(
+                raise IOFreeformError(
                     "Keyword " + key + " in io_freeform_file is not defined"
                     " as type Block")
 
         if value is None:
             if not self.freeform_present(key):
-                raise io_freeform_error(
+                raise IOFreeformError(
                     "Keyword " + key + " not present in io_freeform_file")
         else:
             try:
@@ -659,7 +652,7 @@ class io_freeform_file(object):
 
         if self.keywords is not None:
             if key.upper() not in self.keywords:
-                raise io_freeform_error(
+                raise IOFreeformError(
                     "Keyword " + key + " is not defined for io_freeform_file")
 
         try:

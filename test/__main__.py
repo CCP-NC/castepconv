@@ -52,7 +52,7 @@ class CConvTests(unittest.TestCase):
             # And this should fail
             with self.assertRaises(IOFreeformError):
                 ioff = IOFreeformFile(tmp.name, keywords=[
-                    Keyword('keyw', 'S:B')])
+                    Keyword('keyw', 'S:B')], tolerant=False)
 
     def test_utils(self):
 

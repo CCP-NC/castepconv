@@ -113,7 +113,8 @@ class IOCellFile(IOFreeformFile):
         self.ppots = []
         if self.freeform_present("species_pot"):
             ppot = []
-            pspotline_regex = re.compile("[0-9\.]+\|[0-9\.]+\|[0-9\.]+\|")
+            pspotline_regex = re.compile('[0-9\\.]+\\|[0-9\\.]+'
+                                         '\\|[0-9\\.]+\\|')
             pot_block = self.freeform_block("species_pot")
             try:
                 for l in pot_block:
@@ -198,3 +199,15 @@ class IOCellFile(IOFreeformFile):
             self.freeform_block('positions_frac', pos_block_displ)
 
         return self
+
+    def set_kpoint_grid(self, small_k=1):
+
+        kpn_grid = tuple([int(small_k * e)
+                          for e in self.kbase])
+
+        # Clean all pre-existing kpoints keywords
+        for k in ("kpoints_mp_grid", "kpoint_mp_grid", "kpoints_mp_spacing",
+                  "kpoint_mp_spacing", "kpoints_list", "kpoint_list"):
+            self.freeform_remove(k)
+
+        self.freeform_integer_vector('kpoints_mp_grid', kpn_grid)

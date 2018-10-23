@@ -99,6 +99,17 @@ class CConvTests(unittest.TestCase):
                          iocf.freeform_block('positions_frac')[0].split()[1:]])
             self.assertTrue(displ**0.5 <= 0.15)
 
+            iocf.set_kpoint_grid(2)
+
+            self.assertListEqual(iocf
+                                 .freeform_integer_vector('kpoints_mp_grid'),
+                                 [2, 2, 2])
+
+    def test_scan(self):
+        from cconv.scan import CastepScan
+
+        
+
     def test_utils(self):
 
         from cconv.utils import floatrange

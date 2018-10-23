@@ -324,3 +324,8 @@ default_units = {
     'CL': 'debye',
     'C**2/M': 'debye**2/ang**2/amu',
 }
+
+# Length units allowed by CASTEP. Internally used unit is always Angstroms
+
+castep_length_units = {'ang': 1.0, 'm': 1.0e10, 'cm': 1.0e8,
+                       'nm': 10.0, 'bohr': 0.529, 'a0': 0.529}

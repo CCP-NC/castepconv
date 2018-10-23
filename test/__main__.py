@@ -62,6 +62,43 @@ class CConvTests(unittest.TestCase):
         ioff.freeform_real_vector('Test', value=[2.0, 3.0, 4.5])
         self.assertListEqual(ioff.freeform_real_vector('TEST'), [2, 3, 4.5])
 
+    def test_cell(self):
+
+        from cconv.io.cell import IOCellFile
+
+        with tempfile.NamedTemporaryFile() as tmp:
+            tmp.write(b"""
+                %block lattice_cart
+                    2   0   0
+                    0   2   0
+                    0   0   2
+                %endblock lattice_cart
+
+                %block positions_frac
+                H 0 0 0
+                H 0.5 0.5 0.5
+                %endblock positions_frac
+
+                kpoints_mp_grid 3 1 2
+
+                %block species_pot
+                Si  Si_00.usp
+                %endblock species_pot
+            """)
+            tmp.flush()
+
+            iocf = IOCellFile(tmp.name)
+
+            self.assertListEqual(iocf
+                                 .freeform_integer_vector('kpoints_mp_grid'),
+                                 [3, 1, 2])
+
+            iocf.displace_cell()
+
+            displ = sum([float(x)**2 for x in
+                         iocf.freeform_block('positions_frac')[0].split()[1:]])
+            self.assertTrue(displ**0.5 <= 0.15)
+
     def test_utils(self):
 
         from cconv.utils import floatrange

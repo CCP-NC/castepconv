@@ -526,8 +526,6 @@ def displace_cell_atoms(cfile, abc, d):
                 # you'd still get an equilibrium structure
                 # Won't work for single atom unit cells. This needs fixing. It
                 # might also break if there are symmetries in the system.
-                print(l_split)
-                print(xyz)
                 fac = (i % 2)*2-1
                 if pos_is_abs:
                     l = '{0} {1} {2} {3}'.format(

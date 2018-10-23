@@ -30,7 +30,7 @@ class CConvTests(unittest.TestCase):
 
         # Write a test temporary file
         with tempfile.NamedTemporaryFile() as tmp:
-            tmp.write("""
+            tmp.write(b"""
                 keyw: this
                 keyn: 333
             """)
@@ -54,26 +54,13 @@ class CConvTests(unittest.TestCase):
                 ioff = IOFreeformFile(tmp.name, keywords=[
                     Keyword('keyw', 'S:B')])
 
-    def test_gnuplot(self):
+    def test_utils(self):
 
-        from cconv.graphs import gp_graph
+        from cconv.utils import floatrange
 
-        # Fake data
-        data = {
-            'cut': {
-                'range': [300, 400, 500],
-                'nrg': [4, 2, 1]
-            },
-            'kpn': {
-                'range': [(1,1,1), (2,2,2), (3,3,3)],
-                'nrg': [4, 2, 1]            
-            },
-            'fgm': {
-                'range': []
-            }
-        }
-
-        gp_graph('test', data)
+        frng = floatrange(300, 400, 50)
+        self.assertEqual(len(frng), 3)
+        self.assertListEqual(frng, [300, 350, 400])
 
 
 if __name__ == "__main__":

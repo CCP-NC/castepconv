@@ -133,6 +133,9 @@ class IOFreeformFile(object):
         new_copy.keyvals = copy.copy(self.keyvals)
         return new_copy
 
+    def copy(self):
+        return self.__copy__()
+
     def freeform_load(self, fname, keywords=None):
         """Open a file and parse its keywords
 
@@ -153,7 +156,8 @@ class IOFreeformFile(object):
         # First, check that the keywords argument is valid, and open the file
 
         try:
-            filelines = open(fname, 'r').readlines()
+            with open(fname, 'r') as f:
+                filelines = f.readlines()
         except IOError:
             raise IOFreeformError(
                 "File " + fname + " passed to freeform_load not found")
@@ -694,3 +698,18 @@ class IOFreeformFile(object):
             printed_file += "\n"
 
         return printed_file
+
+    def freeform_save(self, fname):
+        """Saves as freeform file.
+
+        Args:
+
+            fname (str): name of the file to save
+
+        Returns:
+
+            None
+        """
+
+        with open(fname, 'w') as fsave:
+            fsave.write(self.freeform_print())

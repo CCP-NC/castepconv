@@ -558,7 +558,7 @@ class IOFreeformFile(object):
                     "Keyword " + key + " not present in io_freeform_file")
         else:
             try:
-                self.keyvals[key] = '%f %f %f' % value
+                self.keyvals[key] = '{0:f} {1:f} {2:f}'.format(*value)
             except TypeError:
                 raise ValueError("value must be a list/tuple of 3 elements")
 
@@ -602,7 +602,7 @@ class IOFreeformFile(object):
                     "Keyword " + key + " not present in io_freeform_file")
         else:
             try:
-                self.keyvals[key] = '%i %i %i' % value
+                self.keyvals[key] = '{0:d} {1:d} {2:d}'.format(*value)
             except TypeError:
                 raise ValueError("value must be a list/tuple of 3 elements")
 

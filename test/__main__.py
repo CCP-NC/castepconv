@@ -54,6 +54,14 @@ class CConvTests(unittest.TestCase):
                 ioff = IOFreeformFile(tmp.name, keywords=[
                     Keyword('keyw', 'S:B')], tolerant=False)
 
+        # Now test an empty, tolerant file
+        ioff = IOFreeformFile()
+        ioff.freeform_integer_vector('Test', value=[3, 3, 3])
+        self.assertEqual(ioff.keyvals['TEST'], '3 3 3')
+        ioff = IOFreeformFile()
+        ioff.freeform_real_vector('Test', value=[2.0, 3.0, 4.5])
+        self.assertListEqual(ioff.freeform_real_vector('TEST'), [2, 3, 4.5])
+
     def test_utils(self):
 
         from cconv.utils import floatrange

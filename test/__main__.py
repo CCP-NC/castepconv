@@ -19,13 +19,13 @@ import cconv
 class CConvTests(unittest.TestCase):
 
     def test_keyword(self):
-        from cconv.io_freeform import (IOKeywordError, Keyword)
+        from cconv.io.freeform import (IOKeywordError, Keyword)
 
         with self.assertRaises(IOKeywordError):
             kw = Keyword('dummy', 'none')
 
     def test_freeform(self):
-        from cconv.io_freeform import (IOKeywordError, IOFreeformError,
+        from cconv.io.freeform import (IOKeywordError, IOFreeformError,
                                        Keyword, IOFreeformFile)
 
         # Write a test temporary file

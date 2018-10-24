@@ -8,7 +8,9 @@ from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
 
+from cconv.io.freeform import IOFreeformFile
 from cconv.io.cell import IOCellFile
+from cconv.utils import cut_to_k
 
 
 class CastepScan(object):
@@ -17,10 +19,13 @@ class CastepScan(object):
     """
 
     def __init__(self, base_cell, base_param, base_cut=400, base_kpn=1,
-                 use_stress=False):
+                 base_fgm=None, use_stress=False):
 
         if not isinstance(base_cell, IOCellFile):
             raise ValueError('base_cell is not IOCellFile')
+
+        if not isinstance(base_param, IOFreeformFile):
+            raise ValueError('base_param is not IOFreeformFile')
 
         self._cell = base_cell.copy()
         self._param = base_param.copy()
@@ -31,7 +36,11 @@ class CastepScan(object):
             self._param.freeform_boolean('calculate_stress', True)
         # Set the base cutoff
         self._param.freeform_physical('cut_off_energy', 'E', base_cut, 'ev')
+        # K-point grid
         self._cell.set_kpoint_grid(base_kpn)
+        # And fine grid
+        if base_fgm is not None:
+            self._param.freeform_real('fine_gmax', cut_to_k(base_fgm))
 
         self._ranges = {}
 
@@ -75,3 +84,21 @@ class CastepScan(object):
 
         self._ranges['kpn']['labels'] = labels
         self._ranges['kpn']['files'] = files
+
+    def set_fgm_range(self, fgm_range=[]):
+        self._ranges['fgm'] = {
+            'longname': 'Fine GMax (eV)',
+            'values': fgm_range,
+            'labels': [str(f) for f in fgm_range],
+        }
+
+        files = []
+
+        for i, fgm in enumerate(fgm_range):
+            cf = self._cell.copy()
+            pf = self._param.copy()
+
+            pf.freeform_real('fine_gmax', cut_to_k(fgm))
+            files.append((cf, pf))
+
+        self._ranges['fgm']['files'] = files

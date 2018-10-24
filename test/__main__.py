@@ -1,3 +1,9 @@
+# Python 2-to-3 compatibility code
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+from __future__ import unicode_literals
+
 import os
 import sys
 import unittest
@@ -28,7 +34,7 @@ class CConvTests(unittest.TestCase):
 
         # Write a test temporary file
         with tempfile.NamedTemporaryFile() as tmp:
-            tmp.write("""
+            tmp.write(b"""
                 keyw:   this
                 keyn: 333
             """)

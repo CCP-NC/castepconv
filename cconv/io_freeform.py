@@ -5,10 +5,16 @@ It is heavily inspired in its interface to the original io module but the code
 is written from scratch and uses a more object-oriented approach
 """
 
+# Python 2-to-3 compatibility code
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+from __future__ import unicode_literals
+
 import re
 import collections
 import copy
-from units import phys_units, default_units
+from .units import phys_units, default_units
 
 
 class io_keyword_error(Exception):
@@ -61,10 +67,7 @@ class keyword(object):
     def __init__(self, key, typ, description=''):
 
         # Check that arguments are ok
-        if type(key) is not str:
-            raise io_keyword_error("Invalid key argument passed to keyword")
-        else:
-            self.key = key
+        self.key = str(key)
 
         try:
             typmatch = re.findall('(S|I|R|P|D|L|V|W|B):(B|I|E|D)', typ.upper())
@@ -77,11 +80,7 @@ class keyword(object):
         except TypeError:
             raise io_keyword_error("Invalid typ argument passed to keyword")
 
-        if type(description) is not str:
-            raise io_keyword_error(
-                "Invalid description argument passed to keyword")
-        else:
-            self.description = description
+        self.description = str(description)
 
 
 def io_unit_to_atomic(val, units):
@@ -153,15 +152,11 @@ class io_freeform_file(object):
 
         # First, check that the keywords argument is valid, and open the file
 
-        if type(fname) is not str:
+        try:
+            filelines = open(fname, 'r').readlines()
+        except IOError:
             raise io_freeform_error(
-                "Invalid fname argument passed to io_freeform_load")
-        else:
-            try:
-                filelines = open(fname, 'r').readlines()
-            except IOError:
-                raise io_freeform_error(
-                    "File " + fname + " passed to io_freeform_load not found")
+                "File " + fname + " passed to io_freeform_load not found")
 
         if keywords is not None:
             if type(keywords) is not list or not all([type(k) is keyword
@@ -201,7 +196,7 @@ class io_freeform_file(object):
                 # Empty line... skip
                 continue
 
-            lsplit = re.split('\s*[:=]*\s+', l, 1)
+            lsplit = re.split('\\s*[:=]*\\s+', l, 1)
 
             # Are we reading a block or not?
 
@@ -705,4 +700,4 @@ if __name__ == "__main__":
 
     f = io_freeform_file()
 
-    print f.freeform_print()
+    print((f.freeform_print()))

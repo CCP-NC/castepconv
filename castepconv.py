@@ -7,6 +7,12 @@
 # This software is distributed under the terms of the GNU General Public
 # License (GNU GPL)
 
+# Python 2-to-3 compatibility code
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+from __future__ import unicode_literals
+
 import sys
 import time
 import math
@@ -258,6 +264,15 @@ def rindex_cont(my_list, my_el):
             return i-1
     return None
 
+
+def safe_input(question):
+    """Ask for user input with Python 2 and 3 compatibility"""
+    try:
+        return raw_input(question)
+    except NameError:
+        # Python 3
+        return input(question)
+
 # Parse .conv file for convergence calculation options
 
 
@@ -292,9 +307,9 @@ def parse_convfile(cfile):
                 # A basic sanity check
                 if (str_par_names[par_name] == 'rcmd' and
                         '<seedname>' not in cline[1]):
-                    print(__WARNING__ + ": running_command does not contain "
-                          "a <seedname> tag.\n"
-                          "This is likely erroneous. Please check.\n")
+                    print((__WARNING__ + ": running_command does not contain "
+                           "a <seedname> tag.\n"
+                           "This is likely erroneous. Please check.\n"))
             str_par_vals[str_par_names[par_name]] = cline[1].strip()
         elif (par_name in float_par_names):
             float_par_vals[float_par_names[par_name]] = float(cline[1])
@@ -864,26 +879,26 @@ def create_conv_folder(foldname, jobname, cut, kpn, fgm, prev_jobname=None):
     global str_par_vals, pseudo_pots, sscript
 
     if not os.path.exists(foldname):
-        print "Creating folder " + foldname
+        print(("Creating folder " + foldname))
         os.makedirs(foldname)
     elif (not ovwrite_files and len(os.listdir(foldname)) > 0 and
           prev_jobname is None):
-        to_del = raw_input(__WARNING__ + ": folder " + foldname +
-                           " already exists. \n"
-                           "Some files might be overwritten. "
-                           "Continue (y/N/y-all)?")
+        to_del = safe_input(__WARNING__ + ": folder " + foldname +
+                            " already exists. \n"
+                            "Some files might be overwritten. "
+                            "Continue (y/N/y-all)?")
         if to_del.lower() == 'y-all':
             ovwrite_files = True
         elif to_del.lower() != 'y':
             sys.exit("Aborting")
 
-    print "Creating files for job " + jobname
+    print(("Creating files for job " + jobname))
     icell = open(os.path.join(foldname, jobname + '.cell'), 'w')
     iparam = open(os.path.join(foldname, jobname + '.param'), 'w')
 
     if sscript is not None:
 
-        print "Copying submission script"
+        print("Copying submission script")
 
         iscript = open(os.path.join(foldname, jobname), 'w')
         for l in sscript:
@@ -937,7 +952,7 @@ def job_run(foldname, jobname, running_jobs=None):
     if (os.path.isfile(jobname + ".castep") or
         os.path.isfile(jobname + ".check") or
             os.path.isfile(jobname + ".0001.err")):
-        print "Removing output files from previous jobs for " + jobname
+        print(("Removing output files from previous jobs for " + jobname))
         if os.path.isfile(jobname + ".castep"):
             os.remove(jobname + ".castep")
         if os.path.isfile(jobname + ".check"):
@@ -957,7 +972,7 @@ def job_run(foldname, jobname, running_jobs=None):
         stdout_file = open(stdout_file, 'w')
 
     try:
-        print "Running job " + jobname
+        print(("Running job " + jobname))
         sp.Popen(cmd_line, stdin=stdin_file, stdout=stdout_file)
     except OSError:
         sys.exit("ERROR - Command:\n>\t" +
@@ -992,13 +1007,13 @@ def multijob_wait(running_jobs=None, wait_all=False):
                             del running_jobs[job_ind]
                     except JobError as JE:
                         del running_jobs[job_ind]
-                        print __WARNING__ + " - " + str(JE)
+                        print((__WARNING__ + " - " + str(JE)))
     else:
         # SERIAL operation case
         try:
             jobfinish_wait(foldname, jobname)
         except JobError as JE:
-            print __WARNING__ + " - " + str(JE)
+            print((__WARNING__ + " - " + str(JE)))
 
 # Run a dryrun to create pseudopotentials
 
@@ -1015,18 +1030,18 @@ def create_pseudopots(seedname, pseudo_pots, tmp):
     except IOError:
         pass  # No big deal
 
-    print "Starting dryrun..."
+    print("Starting dryrun...")
     cmd = str_par_vals['drcmd'].replace('<seedname>', seedname)
     sp.Popen(cmd.split(), cwd=tmp, stdout=sp.PIPE, stderr=sp.PIPE,
              stdin=sp.PIPE).communicate()
-    print "Dryrun finished"
+    print("Dryrun finished")
     # Did it go well?
     try:
         drfile = ('No problems found with input files.' in
                   open(os.path.join(tmp,
                                     seedname + '.castep')).readlines()[-9])
     except IOError:
-        print __WARNING__ + ": dryrun failed"
+        print((__WARNING__ + ": dryrun failed"))
 
     # Ok, grab pseudopotentials
     if drfile:
@@ -1036,7 +1051,7 @@ def create_pseudopots(seedname, pseudo_pots, tmp):
             el = bname.split('_')[0]
             pseudo_pots.append(PPotEntry(el, ppf, True))
     else:
-        print __WARNING__ + ": dryrun failed"
+        print((__WARNING__ + ": dryrun failed"))
 
 
 # Find and if needed copy the pseudo potential files
@@ -1083,10 +1098,10 @@ def find_pseudopots(seedname, pseudo_pots):
                 if not os.path.exists(pp_folder):
                     os.makedirs(pp_folder)
                 elif not ovwrite_files:
-                    to_del = raw_input(__WARNING__ + ": folder " + pp_folder +
-                                       " already exists.\n"
-                                       "Some files might be overwritten. "
-                                       "Continue (y/N/y-all)?")
+                    to_del = safe_input(__WARNING__ + ": folder " + pp_folder +
+                                        " already exists.\n"
+                                        "Some files might be overwritten. "
+                                        "Continue (y/N/y-all)?")
                     if to_del.lower() == 'y-all':
                         ovwrite_files = True
                     elif to_del.lower() != 'y':
@@ -1194,9 +1209,9 @@ if __name__ == '__main__':
         sys.exit("ERROR - Python version 2.6 or higher required "
                  "to run the script")
 
-    print "CASTEPconv v. " + __vers_number__ + "\n"
-    print "by Simone Sturniolo"
-    print "Copyright 2014 Science and Technology Facilities Council\n"
+    print(("CASTEPconv v. " + __vers_number__ + "\n"))
+    print("by Simone Sturniolo")
+    print("Copyright 2014 Science and Technology Facilities Council\n")
 
     seedname, cmdline_task = parse_cmd_args()
 
@@ -1206,13 +1221,13 @@ if __name__ == '__main__':
     # PHASE 0 - Check for existence of all required files and read the
     # necessary information
 
-    print "Reading " + seedname + ".conv"
+    print(("Reading " + seedname + ".conv"))
 
     try:
         job_convfile = open(seedname + ".conv", 'r')
     except IOError:
-        print(__WARNING__ + ": - Convergence parameter file for job " +
-              seedname + " not found. Using default parameters")
+        print((__WARNING__ + ": - Convergence parameter file for job " +
+               seedname + " not found. Using default parameters"))
         job_convfile = None
 
     if job_convfile is not None:
@@ -1225,14 +1240,14 @@ if __name__ == '__main__':
 
     if (str_par_vals['ctsk'] != "output"):
 
-        print "Reading " + seedname + ".cell"
+        print(("Reading " + seedname + ".cell"))
 
         try:
             assert os.path.isfile(seedname + ".cell")
         except AssertionError:
             sys.exit("ERROR - .cell file for job " + seedname + " not found")
 
-        print "Reading " + seedname + ".param"
+        print(("Reading " + seedname + ".param"))
 
     else:
         cellfile_lines = None
@@ -1243,8 +1258,8 @@ if __name__ == '__main__':
     try:
         stripped_param = strip_paramfile(seedname + ".param")
     except io_freeform_error:
-        print(__WARNING__ + " - .param file for job " + seedname +
-              " not found")
+        print((__WARNING__ + " - .param file for job " + seedname +
+               " not found"))
         stripped_param = io_freeform_file()
 
     # Override task in .conv file with command line options
@@ -1294,21 +1309,21 @@ if __name__ == '__main__':
                 to_del_files += [seedname + suff]
 
         if (len(to_del_fold) > 0):
-            print "The following folders will be deleted:"
+            print("The following folders will be deleted:")
             for f in to_del_fold:
                 sys.stdout.write(f + ' ')
-            print ""
+            print("")
 
         if (len(to_del_files) > 0):
-            print "The following files will be deleted:"
+            print("The following files will be deleted:")
             for f in to_del_files:
                 sys.stdout.write(f + ' ')
-            print ""
+            print("")
 
         if ((len(to_del_fold) + len(to_del_files)) == 0):
-            print "No folders or files to delete found"
+            print("No folders or files to delete found")
         else:
-            to_del = raw_input("Continue (y/N)?")
+            to_del = safe_input("Continue (y/N)?")
 
             if to_del.lower() == 'y':
 
@@ -1343,22 +1358,22 @@ if __name__ == '__main__':
         if str_par_vals["subs"] is not None:
 
             if not os.path.isfile(str_par_vals["subs"]):
-                print(__WARNING__ + ": submission script " +
-                      str_par_vals["subs"] + " not found, skipping")
+                print((__WARNING__ + ": submission script " +
+                       str_par_vals["subs"] + " not found, skipping"))
             else:
                 sscript = open(str_par_vals["subs"], 'r').readlines()
                 # Sanity check
                 has_seed = any(['<seedname>' in l for l in sscript])
                 if not has_seed:
-                    print(__WARNING__ + ": submission script does not contain"
-                          " a <seedname> tag.\n"
-                          "This is likely erroneous. Please check.\n")
+                    print((__WARNING__ + ": submission script does not contain"
+                           " a <seedname> tag.\n"
+                           "This is likely erroneous. Please check.\n"))
 
         # Apply displacements to .cell atoms if needed to have non-zero forces
 
         if float_par_vals["displ"] > 0.0:
-            print("Displacing atoms in .cell file of " +
-                  str(float_par_vals["displ"]) + " Angstroms")
+            print(("Displacing atoms in .cell file of " +
+                   str(float_par_vals["displ"]) + " Angstroms"))
             try:
                 stripped_cell = displace_cell_atoms(
                     stripped_cell, abc_len, float_par_vals["displ"])
@@ -1369,7 +1384,7 @@ if __name__ == '__main__':
         # .conv_tab file
 
         if bool_par_vals["rcalc"] and os.path.isfile(seedname + ".conv_tab"):
-            print "Reusing results from previous convergence calculations"
+            print("Reusing results from previous convergence calculations")
             old_cutrange, old_kpnrange, old_fgmrange = parse_conv_tab_file(
                 open(seedname + ".conv_tab", 'r'))
         else:
@@ -1381,10 +1396,10 @@ if __name__ == '__main__':
         # Will be read if output is done as a separate operation
 
         if os.path.isfile(seedname + ".conv_tab") and not ovwrite_files:
-            to_del = raw_input(__WARNING__ + ": " + seedname +
-                               ".conv_tab already exists. "
-                               "This file will be overwritten."
-                               " Continue (y/N/y-all)?")
+            to_del = safe_input(__WARNING__ + ": " + seedname +
+                                ".conv_tab already exists. "
+                                "This file will be overwritten."
+                                " Continue (y/N/y-all)?")
             if to_del.lower() == 'y-all':
                 ovwrite_files = True
             elif to_del.lower() != 'y':
@@ -1460,13 +1475,14 @@ if __name__ == '__main__':
 
         if str_par_vals["rmode"] == "parallel":
 
-            print "Creating folders for parallel convergence run"
+            print("Creating folders for parallel convergence run")
 
         elif str_par_vals["rmode"] == "serial":
 
             foldname = seedname + "_conv"
 
-            print "Creating folder " + foldname + " for serial convergence run"
+            print(("Creating folder " + foldname +
+                   " for serial convergence run"))
 
             # Check whether the folder exists from previous jobs or you're just
             # creating it now...
@@ -1474,10 +1490,10 @@ if __name__ == '__main__':
             if not os.path.exists(foldname):
                 os.makedirs(foldname)
             elif not ovwrite_files:
-                to_del = raw_input(__WARNING__ + ": folder " + foldname +
-                                   " already exists. "
-                                   "\nSome files might be overwritten. "
-                                   "Continue (y/N/y-all)?")
+                to_del = safe_input(__WARNING__ + ": folder " + foldname +
+                                    " already exists. "
+                                    "\nSome files might be overwritten. "
+                                    "Continue (y/N/y-all)?")
                 if to_del.lower() == 'y-all':
                     ovwrite_files = True
                 elif to_del.lower() != 'y':
@@ -1516,13 +1532,13 @@ if __name__ == '__main__':
 
         if str_par_vals["rmode"] == "parallel":
 
-            print "Running parallel convergence jobs"
+            print("Running parallel convergence jobs")
 
             running_jobs = []
 
         elif str_par_vals["rmode"] == "serial":
 
-            print "Running serial convergence jobs"
+            print("Running serial convergence jobs")
 
             running_jobs = None
 
@@ -1546,7 +1562,7 @@ if __name__ == '__main__':
             multijob_wait(running_jobs, wait_all=(i == (len(allrange)-1)))
 
         if (str_par_vals["ctsk"] == "all"):
-            print "\n -- All jobs finished. Proceeding to analyze output --\n"
+            print("\n -- All jobs finished. Proceeding to analyze output --\n")
 
     # PHASE 3 - OUTPUT PARSING
     # Here is where we parse the .CASTEP files and draw our conclusions
@@ -1669,9 +1685,9 @@ if __name__ == '__main__':
                              filepath + " do not correspond to "
                              "expected values")
                 else:
-                    print(__WARNING__ + " - fine_Gmax value used in " +
-                          filepath + " is greater than the set value of "
-                          "fine_gmax_min due to the higher cutoff")
+                    print((__WARNING__ + " - fine_Gmax value used in " +
+                           filepath + " is greater than the set value of "
+                           "fine_gmax_min due to the higher cutoff"))
 
             if castep_data['nrg'] is None or castep_data['for'] is None:
                 sys.exit("ERROR - Incomplete simulation results in " +

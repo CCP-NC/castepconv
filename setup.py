@@ -1,9 +1,10 @@
 #!/usr/bin/python
 
 from distutils.core import setup
+from castepconv import __version__
 
 setup(name='castepconv',
-    version='1.0.1',
+    version=__version__,
     packages = ['cconv'],
     scripts=['castepconv.py'],
     )

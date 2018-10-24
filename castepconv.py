@@ -28,7 +28,7 @@ from collections import namedtuple
 from cconv.graphs import gp_graph, agr_graph
 from cconv.io_freeform import io_freeform_file, io_freeform_error
 
-__vers_number__ = "1.0.2"
+__version__ = "1.1"
 
 # Try importing argparse - if the Python version is too old, use optparse
 
@@ -1209,7 +1209,7 @@ if __name__ == '__main__':
         sys.exit("ERROR - Python version 2.6 or higher required "
                  "to run the script")
 
-    print(("CASTEPconv v. " + __vers_number__ + "\n"))
+    print(("CASTEPconv v. " + __version__ + "\n"))
     print("by Simone Sturniolo")
     print("Copyright 2014 Science and Technology Facilities Council\n")
 

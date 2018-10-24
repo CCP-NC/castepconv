@@ -35,9 +35,9 @@ class CastepScan(object):
 
         self._ranges = {}
 
-    def set_cut_range(self, cut_range=[]):
+    def set_cut_range(self, cut_range=[], unit='ev'):
         self._ranges['cut'] = {
-            'longname': 'Cut Off Energy (eV)'
+            'longname': 'Cut Off Energy (eV)',
             'values': cut_range,
             'labels': [str(c) for c in cut_range],
         }
@@ -48,14 +48,14 @@ class CastepScan(object):
             cf = self._cell.copy()
             pf = self._param.copy()
 
-            pf.freeform_physical('cut_off_energy', 'E', cut, 'ev')
-            files.push((cf, pf))
+            pf.freeform_physical('cut_off_energy', 'E', cut, unit)
+            files.append((cf, pf))
 
         self._ranges['cut']['files'] = files
 
     def set_kpn_range(self, kpn_range=[]):
         self._ranges['kpn'] = {
-            'longname': 'K-points Grid'
+            'longname': 'K-points Grid',
             'values': kpn_range
         }
 
@@ -67,7 +67,7 @@ class CastepScan(object):
 
             cf.set_kpoint_grid(kpn)
 
-            files.push((cf, pf))
+            files.append((cf, pf))
 
         labels = ['x'.join([str(k) for k in
                             c.freeform_integer_vector('kpoints_mp_grid')])

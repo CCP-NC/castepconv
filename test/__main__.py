@@ -15,6 +15,9 @@ import tempfile
 sys.path = [os.path.abspath('../')] + sys.path
 import cconv
 
+# Test files directory
+testdir = os.path.join(os.path.split(__file__)[0], 'files')
+
 
 class CConvTests(unittest.TestCase):
 
@@ -105,10 +108,33 @@ class CConvTests(unittest.TestCase):
                                  .freeform_integer_vector('kpoints_mp_grid'),
                                  [2, 2, 2])
 
+            # Check copying
+            iocf_copy = iocf.copy()
+            iocf_copy.ppots[0] = 'N/A'
+            # Verify that they're pointing at different locations
+            self.assertNotEqual(iocf_copy.ppots[0], iocf.ppots[0])
+
     def test_scan(self):
         from cconv.scan import CastepScan
+        from cconv.io import IOFreeformFile, IOCellFile
 
-        
+        cf = IOCellFile(os.path.join(testdir, 'Si.cell'))
+        pf = IOFreeformFile(os.path.join(testdir, 'Si.param'))
+
+        sc = CastepScan(cf, pf)
+
+        sc.set_cut_range([300, 400, 500])
+        sc.set_kpn_range([1, 2, 4])
+
+        cut_params = [p for c, p in sc._ranges['cut']['files']]
+        self.assertAlmostEqual(cut_params[2]
+                               .freeform_physical('cut_off_energy',
+                                                  'E', unit='ev'),
+                               500)
+        kpn_cells = [c for c, p in sc._ranges['kpn']['files']]
+        self.assertListEqual(kpn_cells[2]
+                             .freeform_integer_vector('kpoints_mp_grid'),
+                             [4, 4, 4])
 
     def test_utils(self):
 

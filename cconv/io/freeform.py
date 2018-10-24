@@ -92,6 +92,12 @@ def io_unit_to_atomic(val, units):
     return val*phys_units[units]['value']
 
 
+def io_atomic_to_unit(val, units):
+    if units not in phys_units:
+        raise ValueError("Invalid units " + units)
+    return val/phys_units[units]['value']
+
+
 def io_unit_to_default(val, units):
     if units not in phys_units:
         raise ValueError("Invalid units " + units)
@@ -141,8 +147,8 @@ class IOFreeformFile(object):
             self.freeform_load(fname)
 
     def __copy__(self):
-        new_copy = type(self)()
-        new_copy.keywords = copy.copy(self.keywords)
+        new_copy = IOFreeformFile(keywords=self.keywords.values(),
+                                  tolerant=self.tolerant)
         new_copy.keyvals = copy.copy(self.keyvals)
         return new_copy
 
@@ -399,7 +405,8 @@ class IOFreeformFile(object):
 
         Returns:
 
-            value(float): the value of the keyword as real, in atomic units
+            value(float): the value of the keyword as real, in user specified
+                          units
         """
 
         key = key.upper()
@@ -433,7 +440,11 @@ class IOFreeformFile(object):
 
             try:
                 value = float(rawvals[0])
-                unit = rawvals[1] if len(rawvals) > 1 else default_units[dim]
+                v_unit = (rawvals[1].lower() if len(rawvals) > 1
+                          else default_units[dim])
+                # Convert value to desired units
+                value = io_unit_to_atomic(value, v_unit)
+                value = io_atomic_to_unit(value, unit)
             except ValueError:
                 raise IOFreeformError(
                     "Invalid arguments for keyword " + key +
@@ -442,11 +453,11 @@ class IOFreeformFile(object):
             if unit is None:
                 unit = default_units[dim]
             self.keyvals[key] = str(value) + ' ' + \
-                phys_units[unit]['unit']
+                phys_units[unit]['unit']            
 
         try:
             if not usedef:
-                return io_unit_to_atomic(value, unit)
+                return value
             else:
                 return io_unit_to_default(value, unit)
         except ValueError:

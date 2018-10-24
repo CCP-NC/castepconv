@@ -10,6 +10,7 @@ from __future__ import unicode_literals
 
 import os
 import re
+import copy
 import math
 import random
 from collections import namedtuple, OrderedDict
@@ -22,13 +23,13 @@ PPotEntry = namedtuple('pspot_entry',
                        ['element', 'entry', 'is_file'])
 
 
-class CellError(Exception):
+class IOCellError(Exception):
     pass
 
 
 class IOCellFile(IOFreeformFile):
 
-    def __init__(self, fname):
+    def __init__(self, fname=None):
 
         # This being a cellfile, it is by default tolerant but has certain
         # keywords
@@ -42,7 +43,28 @@ class IOCellFile(IOFreeformFile):
             Keyword('kpoints_mp_grid', 'W')
         ]
 
-        IOFreeformFile.__init__(self, fname=fname, keywords=cell_kw)
+        IOFreeformFile.__init__(self, keywords=cell_kw)
+
+        self.abc = []
+        self.kbase = []
+        self.ppots = []
+
+        if fname is not None:
+            self.cell_load(fname)
+
+    def __copy__(self):
+        new_copy = IOCellFile()
+        new_copy.keywords = copy.deepcopy(self.keywords)
+        new_copy.keyvals = copy.deepcopy(self.keyvals)
+        new_copy.abc = copy.deepcopy(self.abc)
+        new_copy.kbase = copy.deepcopy(self.kbase)
+        new_copy.ppots = copy.deepcopy(self.ppots)
+
+        return new_copy
+
+    def cell_load(self, fname):
+
+        self.freeform_load(fname)
 
         # First, parse the lattice
 
@@ -61,17 +83,17 @@ class IOCellFile(IOFreeformFile):
                     try:
                         hkl_data.append([u*float(x) for x in l_split])
                     except ValueError:
-                        raise CellError(
+                        raise IOCellError(
                             'Bad formatting in .cell file LATTICE_CART block')
                     if (len(hkl_data) == 3):
                         abc = tuple([math.sqrt(sum([x**2.0 for x in hkl]))
                                      for hkl in hkl_data])
                     if (len(hkl_data) > 3):
-                        raise CellError(
+                        raise IOCellError(
                             'Bad formatting in .cell file LATTICE_CART block')
         elif self.freeform_present("lattice_abc"):
             if abc is not None:
-                raise CellError('Duplicated LATTICE_* block in .cell file')
+                raise IOCellError('Duplicated LATTICE_* block in .cell file')
             abc_block = self.freeform_block("lattice_abc")
             for l in abc_block:
                 l_split = l.lower().strip().split()
@@ -81,14 +103,14 @@ class IOCellFile(IOFreeformFile):
                     try:
                         hkl_data.append([u*float(x) for x in l_split])
                     except ValueError:
-                        raise CellError(
+                        raise IOCellError(
                             'Bad formatting in .cell file LATTICE_ABC block')
                     if (len(hkl_data) > 2):
-                        raise CellError(
+                        raise IOCellError(
                             'Bad formatting in .cell file LATTICE_ABC block')
             abc = tuple(hkl_data[0])
         else:
-            raise CellError('No lattice parameters found in .cell file')
+            raise IOCellError('No lattice parameters found in .cell file')
 
         # Save lattice parameters
         self.abc = abc
@@ -148,7 +170,7 @@ class IOCellFile(IOFreeformFile):
                             raise RuntimeError()
 
             except RuntimeError:
-                raise CellError(
+                raise IOCellError(
                     'Bad formatting in .cell file SPECIES_POT block')
 
             self.ppots = ppot
@@ -164,7 +186,7 @@ class IOCellFile(IOFreeformFile):
         elif self.freeform_present('positions_frac'):
             pos_block = self.freeform_block('positions_frac')
         else:
-            raise CellError('No positions found in file')
+            raise IOCellError('No positions found in file')
 
         pos_block_displ = []
 
@@ -175,7 +197,7 @@ class IOCellFile(IOFreeformFile):
                 pos_block_displ.append('ang\n')
             else:
                 if len(l_split) != 4:
-                    raise CellError(
+                    raise IOCellError(
                         'Bad formatting in .cell file POSITION_* block')
                 try:
                     xyz = [float(x) for x in l_split[1:]]
@@ -189,7 +211,7 @@ class IOCellFile(IOFreeformFile):
                             *[l_split[0]] + [x+displ[j]/self.abc[j]
                                              for j, x in enumerate(xyz)])
                 except ValueError:
-                    raise CellError(
+                    raise IOCellError(
                         'Bad formatting in .cell file POSITION_* block')
                 pos_block_displ.append(l)
 

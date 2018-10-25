@@ -73,3 +73,22 @@ class ConvfileTests(unittest.TestCase):
 
         with self.assertRaises(ValueError):
             parsed = parse_convfile(mock_file)
+
+        mock_file = """
+        # Comment
+        cutoff_max: 400
+        cutoff_min: 500
+        """
+
+        with self.assertRaises(ConvError):
+            parsed = parse_convfile(mock_file)
+
+        mock_file = """
+        # Comment
+        cutoff_max: 800
+        fine_gmax_mode: max
+        fgmoff_min: 2000
+        """
+
+        with self.assertRaises(ConvError):
+            parsed = parse_convfile(mock_file)

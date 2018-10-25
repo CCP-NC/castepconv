@@ -16,6 +16,7 @@ from __future__ import unicode_literals
 """Utility functions"""
 
 import sys
+import traceback
 
 
 def check_pyversion():
@@ -24,6 +25,13 @@ def check_pyversion():
                                     sys.version_info[1] < 6)):
         raise RuntimeError("Python version 2.6 or higher required "
                            "to run the script")
+
+
+def safe_input(msg):
+    try:
+        return raw_input(msg)
+    except NameError:
+        return input(msg)
 
 
 def parse_cmd_args():
@@ -44,7 +52,8 @@ def parse_cmd_args():
                                   "Overrides the .conv file value"),
                             )
         args = parser.parse_args()
-        return args.seedname, args.task
+        seed = args.seedname
+        task = args.task
     except ImportError:
         import optparse as op
         parser = op.OptionParser()
@@ -58,9 +67,14 @@ def parse_cmd_args():
         if len(args) != 1:
             raise RuntimeError('Error: too few arguments')
         else:
-            seedname = args[0]
-        return seedname, options.task
+            seed = args[0]
+        task = options.task
 
+    # Interpret the task
+    task = {'i': 'input', 'c': 'clear', 'ir': 'inputrun', 'o': 'output',
+            'a': 'all'}[task]
+
+    return seed, task       
 
 def warn(msg):
     """Print a highlighted warning"""

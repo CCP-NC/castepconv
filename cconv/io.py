@@ -15,6 +15,7 @@ from __future__ import unicode_literals
 
 """Input/Output that needs internal handling"""
 
+import os
 from cconv import utils
 
 
@@ -78,11 +79,11 @@ _conv_parameters = {
     # String parameters
     'convergence_task': ConvPar('convergence_task', 'ctsk', parsestr, 'input',
                                 validoptions=['input', 'inputrun', 'output',
-                                              'all']),
+                                              'all', 'clear']),
     'running_mode': ConvPar('running_mode', 'rmode', parsestr, 'serial',
                             validoptions=['serial', 'parallel']),
     'output_type': ConvPar('output_type', 'outp', parsestr, 'gnuplot',
-                           validoptions=['gnuplot', 'xmgrace']),
+                           validoptions=['gnuplot', 'grace']),
     'fine_gmax_mode': ConvPar('fine_gmax_mode', 'fgmmode', parsestr,
                               validoptions=['min', 'max']),
     # The following must be taken without any modification, so we don't use
@@ -132,10 +133,44 @@ _conv_parameters = {
 }
 
 
-def parse_convfile(cfile):
+def param_check(params):
+    """Check the values of the parameters for internal contradictions"""
 
-    if isinstance(cfile, file):
-        cfile.seek(0)
+    if params['cutmax'] < params['cutmin']:
+        raise ConvError('Invalid parameter - must be cutmax > cutmin')
+
+    if params['kpnmax'] < params['kpnmin']:
+        raise ConvError('Invalid parameter - must be kpnmax > kpnmin')
+
+    # Fine grid max checks
+    if params['fgmmode'] is not None:
+        gscale = 1.75   # This is a CASTEP default
+        lbound = gscale**2*(params['cutmin'] if params['fgmmode'] == 'min'
+                            else params['cutmax'])
+        params['fgmmin'] = (lbound if params['fgmmin'] is None
+                            else params['fgmmin'])
+        params['fgmmax'] = (params['fgmmin']+3*params['fgmstep']
+                            if params['fgmmax'] is None
+                            else params['fgmmax'])
+        if any([params['fgmmax'] <= lbound, params['fgmmin'] < lbound,
+                params['fgmmin'] > params['fgmmax']]):
+            raise ConvError('Invalid parameter - must be fgmmax > fgmmin >= '
+                            '{0}*cutoff_{1}'.format(gscale**2,
+                                                    params['fgmmode']))
+
+    if '<seedname>' not in params['rcmd']:
+        utils.warn('Running command does not contain a <seedname> tag.'
+                   ' This is likely erroneous and needs checking.')
+
+    if params['subs'] is not None and not os.path.isfile(params['subs']):
+        raise ConvError('Submission script file does not exist')
+
+
+def parse_convfile(cfile=''):
+    """Parse .conv file. Accepts file object or contents. If no argument is
+    passed, will return default values"""
+
+    if hasattr(cfile, 'readlines'):
         clines = cfile.readlines()
     else:
         # It should be the contents already
@@ -162,11 +197,8 @@ def parse_convfile(cfile):
 
         value = pardef.parse(value)
 
-        # Sanity check
-        if token == 'running_command' and '<seedname>' not in value:
-            utils.warn('Running command does not contain a <seedname> tag.'
-                       ' This is likely erroneous and needs checking.')
-
         params[pardef.sname] = value
+
+    param_check(params)
 
     return params

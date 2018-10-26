@@ -18,4 +18,5 @@
 symmetry_generate
 
 %BLOCK SPECIES_POT
+Si	Si_C18_LDA_OTF.usp
 %ENDBLOCK SPECIES_POT

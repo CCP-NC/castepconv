@@ -162,8 +162,15 @@ def param_check(params):
         utils.warn('Running command does not contain a <seedname> tag.'
                    ' This is likely erroneous and needs checking.')
 
-    if params['subs'] is not None and not os.path.isfile(params['subs']):
-        raise ConvError('Submission script file does not exist')
+    if params['subs'] is not None:
+        try:
+            with open(params['subs']) as f:
+                if '<seedname>' not in f.read():
+                    utils.warn('Submission script does not contain a'
+                               '<seedname> tag. This is likely erroneous and'
+                               ' needs checking.')
+        except IOError:
+            raise ConvError('Submission script file does not exist')
 
 
 def parse_convfile(cfile=''):

@@ -72,7 +72,7 @@ def parse_cmd_args():
 
     # Interpret the task
     task = {'i': 'input', 'c': 'clear', 'ir': 'inputrun', 'o': 'output',
-            'a': 'all'}[task]
+            'a': 'all'}.get(task)
 
     return seed, task       
 

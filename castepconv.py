@@ -20,10 +20,11 @@ from __future__ import unicode_literals
 import os
 import sys
 import json
+import pickle
 import shutil
 import numpy as np
 from copy import deepcopy
-from collections import OrderedDict
+from collections import OrderedDict, namedtuple
 from ase.calculators.castep import CastepOption
 from ase.io.castep import (read_castep_cell, read_param, write_castep_cell,
                            write_param)
@@ -161,58 +162,100 @@ def add_castepopts(cell):
     cell.calc.cell._options['kpoints_mp_grid'] = kpmp
 
 
-def create_worktree(cell, basename, convpars, convranges):
+WorktreeFolder = namedtuple('WorktreeFolder',
+                            ['name', 'dir', 'seed', 'cell',
+                             'param', 'values', 'labels'])
 
-    # Create filename/folder string
-    has_fgm = convranges['fgm']['values'][0] is not None
-    jobstr = 'cut_{cut}_kpn_{kpn}' + ('_fgm_{fgm}' if has_fgm else '')
 
-    def set_vals(cell, cut, kpn, fgm):
-        cell.calc.param.cut_off_energy = cut
-        cell.calc.cell.kpoints_mp_grid = kpn
-        if fgm is not None:
-            cell.calc.param.fine_gmax = fgm
+class Worktree(object):
 
-    basevals = OrderedDict()
-    baselabels = OrderedDict()
-    for key, crange in convranges.items():
-        basevals[key] = crange['values'][0]
-        baselabels[key] = crange['labels'][0]
+    # A Worktree is a representation of the directory structure holding
+    # input files for calculations
 
-    for key, crange in convranges.items():
-        # Start by setting the base values
-        set_vals(cell, **basevals)
+    def __init__(self, basename, convpars, convranges):
 
-        for v_i, v in enumerate(crange['values']):
+        self._has_fgm = convranges['fgm']['values'][0] is not None
+        jobstr = 'cut_{cut}_kpn_{kpn}' + ('_fgm_{fgm}'
+                                          if self._has_fgm else '')
 
-            if v is None:
-                continue
+        self._reuse = convpars['rcalc']
 
-            jobvals = OrderedDict(basevals)
-            joblabels = OrderedDict(baselabels)
+        # The 'base' values for each structure (first of each range)
+        self._basevals = OrderedDict()
+        self._baselabels = OrderedDict()
 
-            jobvals[key] = v
-            joblabels[key] = crange['labels'][v_i]
+        for key, crange in convranges.items():
+            self._basevals[key] = crange['values'][0]
+            self._baselabels[key] = crange['labels'][0]
 
-            set_vals(cell, **jobvals)
+        self._worktree = OrderedDict()
 
-            # Name?
-            jobname = jobstr.format(**joblabels)
+        for key, crange in convranges.items():
+            for v_i, v in enumerate(crange['values']):
+                if v is None:
+                    continue
 
-            # Now write this stuff
-            if convpars['rmode'] == 'serial':
-                jobdir = basename + _serial_path
-            else:
-                jobdir = os.path.join(basename + _in_dir, jobname)
+                if key != 'cut' and v_i == 0:
+                    # Don't repeat first structure pointlessly
+                    continue
+
+                jobvals = OrderedDict(self._basevals)
+                joblabels = OrderedDict(self._baselabels)
+
+                jobvals[key] = v
+                joblabels[key] = crange['labels'][v_i]
+
+                # Name?
+                jobname = jobstr.format(**joblabels)
+
+                # Now write this stuff
+                if convpars['rmode'] == 'serial':
+                    jobdir = basename + _serial_path
+                else:
+                    jobdir = os.path.join(basename + _in_dir, jobname)
+
+                jobseed = os.path.join(jobdir, jobname)
+
+                self._worktree[jobname] = WorktreeFolder(
+                    jobname,
+                    jobdir,
+                    jobseed,
+                    jobseed + '.cell',
+                    jobseed + '.param',
+                    jobvals,
+                    joblabels)
+
+    @property
+    def tree(self):
+        return self._worktree
+
+    def write(self, a):
+
+        def set_vals(a, cut, kpn, fgm):
+            a.calc.param.cut_off_energy = cut
+            a.calc.cell.kpoints_mp_grid = kpn
+            if fgm is not None:
+                a.calc.param.fine_gmax = fgm
+
+        set_vals(a, **self._basevals)
+
+        for name, job in self._worktree.items():
+
+            set_vals(a, **job.values)
 
             try:
-                os.mkdir(jobdir)
+                os.mkdir(job.dir)
             except OSError:
                 pass
 
-            write_castep_cell(open(os.path.join(jobdir, jobname + '.cell'),
-                                   'w'),
-                              cell)
+            if self._reuse and os.path.isfile(job.cell):
+                # If files exist and we shouldn't overwrite, skip
+                print('Reusing files for {0}'.format(job.seed))
+                continue
+
+            print('Writing files for {0}'.format(job.seed))
+            write_castep_cell(open(job.cell, 'w'), a)
+            write_param(job.param, a.calc.param, force_write=True)
 
 
 """
@@ -346,7 +389,8 @@ def main(seedname, cmdline_task):
         cfile.calc.cell.symmetry_generate = None
         cfile.calc.cell.symmetry_ops = None
 
-    create_worktree(cfile, basename, convpars, convranges)
+    wtree = Worktree(basename, convpars, convranges)
+    wtree.write(cfile)
 
     # Store the ranges for future reference
     json.dump(convranges, open(seedname + '_convtab.json', 'w'))

@@ -129,7 +129,8 @@ _conv_parameters = {
     # Boolean parameters
     'converge_stress': ConvPar('converge_stress', 'cnvstr', parsebool, False),
     'reuse_calcs': ConvPar('reuse_calcs', 'rcalc', parsebool, False),
-    'serial_reuse': ConvPar('serial_reuse', 'sruse', parsebool, True)
+    'serial_reuse': ConvPar('serial_reuse', 'sruse', parsebool, True),
+    'castep_8plus': ConvPar('castep_8plus', 'c8plus', parsebool, True)
 }
 
 

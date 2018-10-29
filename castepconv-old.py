@@ -1175,32 +1175,6 @@ def fgmax_validate():
 # Interpret the command line pipelining and such in running_command
 
 
-def compile_cmd_line(jname):
-
-    global str_par_vals
-
-    cmd_line = str_par_vals["rcmd"]
-
-    # Check for redirections
-
-    stdin_file = None
-    stdout_file = None
-
-    cmd_line = cmd_line.replace('<seedname>', jname)
-
-    if ('<' in cmd_line):
-        # Take the last of the filenames given after a < but before a >
-        stdin_file = cmd_line.split('<')[-1].split('>')[0].split()[-1]
-
-    if ('>' in cmd_line):
-        # Take the last of the filenames given after a > but before a <
-        stdout_file = cmd_line.split('>')[-1].split('<')[0].split()[-1]
-
-    cmd_line = cmd_line.split('<')[0].split('>')[0].split()
-
-    return cmd_line, stdin_file, stdout_file
-
-
 ###### -- MAIN PROGRAM -- ######
 if __name__ == '__main__':
 

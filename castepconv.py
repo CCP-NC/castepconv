@@ -19,13 +19,15 @@ from __future__ import unicode_literals
 
 import os
 import sys
+import time
 import json
 import pickle
 import shutil
 import numpy as np
 from copy import deepcopy
+import subprocess as sp
 from collections import OrderedDict, namedtuple
-from ase.calculators.castep import CastepOption
+from ase.calculators.castep import CastepOption, Castep
 from ase.io.castep import (read_castep_cell, read_param, write_castep_cell,
                            write_param)
 
@@ -95,6 +97,8 @@ def make_ranges(params, kpnbase):
 
 def find_pspots(cell, basename, seedpath='.'):
 
+    pspot_exts = ['.usp', '.uspcc', '.recpot']
+
     pspot_block = cell.calc.cell.species_pot.value
 
     if pspot_block is None:
@@ -128,6 +132,10 @@ def find_pspots(cell, basename, seedpath='.'):
         pspsrc = os.path.join(seedpath, pspsrc)
         if not os.path.isfile(pspsrc):
             # Not a file (e.g. a string)
+            ext = os.path.splitext(pspsrc)[1]
+            if ext in pspot_exts:
+                raise IOError('Pseudopotential file '
+                              '{0} not found'.format(pspsrc))
             pspot_block += l + '\n'
             continue
 
@@ -153,13 +161,40 @@ def find_pspots(cell, basename, seedpath='.'):
     cell.calc.cell.species_pot.value = pspot_block
 
 
-def add_castepopts(cell):
+def add_castepopts(a, c8p=True):
     # These adjustments work for convenience
     # since we're not using a castep_keywords.json
     sgen = CastepOption('symmetry_generate', 'B', 'defined', True)
-    cell.calc.cell._options['symmetry_generate'] = sgen
+    a.calc.cell._options['symmetry_generate'] = sgen
     kpmp = CastepOption('kpoints_mp_grid', 'B', 'integer vector', [1, 1, 1])
-    cell.calc.cell._options['kpoints_mp_grid'] = kpmp
+    a.calc.cell._options['kpoints_mp_grid'] = kpmp
+
+    if c8p:
+        # This is only valid for Castep 8+
+        wcheck = CastepOption('write_checkpoint', 'B', 'string', 'MINIMAL')
+        a.calc.param._options['write_checkpoint'] = wcheck
+
+
+def compile_cmd_line(jobname, cmd_line):
+
+    # Check for redirections
+
+    stdin_file = None
+    stdout_file = None
+
+    cmd_line = cmd_line.replace('<seedname>', jobname)
+
+    if ('<' in cmd_line):
+        # Take the last of the filenames given after a < but before a >
+        stdin_file = cmd_line.split('<')[-1].split('>')[0].split()[-1]
+
+    if ('>' in cmd_line):
+        # Take the last of the filenames given after a > but before a <
+        stdout_file = cmd_line.split('>')[-1].split('<')[0].split()[-1]
+
+    cmd_line = cmd_line.split('<')[0].split('>')[0].split()
+
+    return cmd_line, stdin_file, stdout_file
 
 
 WorktreeFolder = namedtuple('WorktreeFolder',
@@ -179,6 +214,9 @@ class Worktree(object):
                                           if self._has_fgm else '')
 
         self._reuse = convpars['rcalc']
+        self._sreuse = convpars['sruse']
+        self._runmode = convpars['rmode']
+        self._maxjobs = convpars['maxjobs']
 
         # The 'base' values for each structure (first of each range)
         self._basevals = OrderedDict()
@@ -209,7 +247,7 @@ class Worktree(object):
                 jobname = jobstr.format(**joblabels)
 
                 # Now write this stuff
-                if convpars['rmode'] == 'serial':
+                if self._runmode == 'serial':
                     jobdir = basename + _serial_path
                 else:
                     jobdir = os.path.join(basename + _in_dir, jobname)
@@ -256,6 +294,79 @@ class Worktree(object):
             print('Writing files for {0}'.format(job.seed))
             write_castep_cell(open(job.cell, 'w'), a)
             write_param(job.param, a.calc.param, force_write=True)
+
+    def check(self, names=None):
+
+        # Our token to find the end of the file
+        endstr = 'Total time          ='
+
+        if names is None:
+            names = self._worktree.keys()
+
+        # Check if the jobs in the worktree are complete or not
+        complete = OrderedDict()
+        for name in names:
+            job = self._worktree[name]
+            castf = job.seed + '.castep'
+
+            end_i = -1
+            try:
+                castlines = open(castf).readlines()
+            except IOError:
+                complete[name] = False
+                continue
+
+            for i, l in enumerate(castlines):
+                if endstr in l:
+                    end_i = i
+
+            complete[name] = end_i > len(castlines) - 10 # Towards the end...
+
+        return complete
+
+    def run(self, castep_command='castep <seedname>'):
+
+        # First, which ones are to run?
+        to_run = self._worktree.keys()
+        if self._reuse:
+            jobstate = self.check()
+            to_run = [jn for jn, finished in jobstate.items() if not finished]
+        running = []
+
+        # How many at once?
+        maxjobs = 1
+        if self._runmode == 'parallel':
+            maxjobs = self._maxjobs if self._maxjobs > 0 else len(to_run)
+
+        # Now start running
+        while len(to_run) > 0 or len(running) > 0:
+            if len(running) < maxjobs:
+                # Push another!
+                name = to_run.pop(0)
+                job = self._worktree[name]
+
+                cmd_line, stdin, stdout = compile_cmd_line(
+                    name, castep_command)
+
+                if (stdin is not None):
+                    stdin = open(stdin)
+                if (stdout is not None):
+                    stdout = open(stdout, 'w')
+
+                print('Running job {0}...'.format(name))
+                sp.Popen(cmd_line, stdin=stdin, stdout=stdout, cwd=job.dir)
+
+                running.append(name)
+            else:
+                # Wait for one to finish...
+                jobstate = self.check(running)
+                # Which ones are finished?
+                complete = [jn for jn, finished in jobstate.items()
+                            if finished]
+                for jn in complete:
+                    print('Job {0} complete.'.format(jn))
+                    running.remove(jn)
+                time.sleep(1)
 
 
 """
@@ -378,22 +489,30 @@ def main(seedname, cmdline_task):
             if ans.lower() != 'y':
                 return
 
-    # Now look for pseudopotentials
-    find_pspots(cfile, basename, seedpath)
-
-    add_castepopts(cfile)
-
-    # If required, rattle the atoms
-    if convpars['displ'] != 0:
-        cfile.rattle(abs(convpars['displ']))
-        cfile.calc.cell.symmetry_generate = None
-        cfile.calc.cell.symmetry_ops = None
-
+    # The Worktree object is useful for a number of things in all tasks
     wtree = Worktree(basename, convpars, convranges)
-    wtree.write(cfile)
 
-    # Store the ranges for future reference
-    json.dump(convranges, open(seedname + '_convtab.json', 'w'))
+    ### PHASE 1: Input ###
+    if task in ('input', 'inputrun', 'all'):
+        # Now look for pseudopotentials
+        find_pspots(cfile, basename, seedpath)
+
+        add_castepopts(cfile, convpars['c8plus'])
+
+        # If required, rattle the atoms
+        if convpars['displ'] != 0:
+            cfile.rattle(abs(convpars['displ']))
+            cfile.calc.cell.symmetry_generate = None
+            cfile.calc.cell.symmetry_ops = None
+
+        wtree.write(cfile)
+
+    ### PHASE 2: Running ###
+    if task in ('inputrun', 'all'):
+
+        print(wtree.check())
+
+        wtree.run(convpars['rcmd'])
 
 
 if __name__ == '__main__':

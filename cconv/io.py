@@ -16,6 +16,7 @@ from __future__ import unicode_literals
 """Input/Output that needs internal handling"""
 
 import os
+import numpy as np
 from cconv import utils
 
 
@@ -210,3 +211,22 @@ def parse_convfile(cfile=''):
     param_check(params)
 
     return params
+
+
+def write_dat(seedname, data_curves, cwd='.'):
+
+    columns = ['X', 'E', 'F', 'S']
+
+    for xtype, xdata in data_curves.items():
+
+        data = [xdata['values']]
+        if xtype == 'kpn':
+            data = [np.prod(xdata['values'], axis=1)]
+
+        data += [xdata['Ys'][y] for y in columns[1:]]
+        data = np.array(data).T
+
+        np.savetxt(open(os.path.join(cwd,
+                                     '{0}_{1}_conv.dat'.format(seedname,
+                                                               xtype)), 'w'),
+                   data)

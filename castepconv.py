@@ -33,8 +33,8 @@ from ase.io.castep import (read_castep_cell, read_param, write_castep_cell,
                            write_param)
 
 from cconv import utils
-from cconv.io import parse_convfile
-
+from cconv.io import parse_convfile, write_dat
+from cconv.plot import gp_plot
 
 __version__ = "2.0"
 
@@ -66,7 +66,6 @@ def make_ranges(params, kpnbase):
     cutvals = np.arange(params['cutmin'], params['cutmax'] + params['cutstep'],
                         params['cutstep'])
     ranges['cut'] = {
-        'name': 'Cut Off Energy (eV)',
         'values': cutvals.tolist(),
         'labels': list(map(str, cutvals)),
     }
@@ -75,7 +74,6 @@ def make_ranges(params, kpnbase):
                         params['kpnstep'])
     kpnvals = (kpnbase[None, :]*kpnvals[:, None]).astype(int)
     ranges['kpn'] = {
-        'name': 'K-points grid',
         'values': kpnvals.tolist(),
         'labels': list(map(lambda kpn: 'x'.join(map(str, kpn)), kpnvals))
     }
@@ -88,7 +86,6 @@ def make_ranges(params, kpnbase):
         fgmvals = np.array([None])
 
     ranges['fgm'] = {
-        'name': 'Fine GMax (eV)',
         'values': fgmvals.tolist(),
         'labels': list(map(str, fgmvals))
     }
@@ -200,7 +197,12 @@ def compile_cmd_line(jobname, cmd_line):
 
 WorktreeFolder = namedtuple('WorktreeFolder',
                             ['name', 'dir', 'seed', 'cell',
-                             'param', 'values', 'labels'])
+                             'param', 'castep', 'values', 'labels'])
+
+# Check states
+C_READY = 0         # Input ready, no output
+C_COMPLETE = 1      # Job completed successfully
+C_ERROR = 2         # Some kind of error has occurred
 
 
 class Worktree(object):
@@ -228,14 +230,14 @@ class Worktree(object):
             self._baselabels[key] = crange['labels'][0]
 
         self._worktree = OrderedDict()
+        self._ranges = {}  # Store the jobs for each range
 
         for key, crange in convranges.items():
+
+            self._ranges[key] = []
+
             for v_i, v in enumerate(crange['values']):
                 if v is None:
-                    continue
-
-                if key != 'cut' and v_i == 0:
-                    # Don't repeat first structure pointlessly
                     continue
 
                 jobvals = OrderedDict(self._basevals)
@@ -246,6 +248,12 @@ class Worktree(object):
 
                 # Name?
                 jobname = jobstr.format(**joblabels)
+
+                self._ranges[key].append(jobname)
+
+                if key != 'cut' and v_i == 0:
+                    # Don't repeat first structure pointlessly
+                    continue
 
                 # Now write this stuff
                 if self._runmode == 'serial':
@@ -261,6 +269,7 @@ class Worktree(object):
                     jobseed,
                     jobseed + '.cell',
                     jobseed + '.param',
+                    jobseed + '.castep',
                     jobvals,
                     joblabels)
 
@@ -297,7 +306,7 @@ class Worktree(object):
             if self._sreuse:
                 a.calc.param.write_checkpoint = 'ALL'
                 if prevjob is not None:
-                    a.calc.param.continuation = prevjob.name + '.check'
+                    a.calc.param.reuse = prevjob.name + '.check'
 
             print('Writing files for {0}'.format(job.seed))
             write_castep_cell(open(job.cell, 'w'), a)
@@ -322,24 +331,23 @@ class Worktree(object):
         complete = OrderedDict()
         for name in names:
 
-            complete[name] = 0  # Default
+            complete[name] = C_READY  # Default
 
             job = self._worktree[name]
-            castf = job.seed + '.castep'
             errf = glob.glob(job.seed + '.*.err')
 
             if len(errf) > 0:
-                complete[name] = 2
+                complete[name] = C_ERROR
                 continue
 
             end_i = -1
             try:
-                castlines = open(castf).readlines()
+                castlines = open(job.castep).readlines()
                 has_end = any(map(lambda l: endstr in l, castlines[-10:]))
             except IOError:
-                continue
+                continue  # No castep file at all, it's C_READY
 
-            complete[name] = 1 if has_end else 0
+            complete[name] = C_COMPLETE if has_end else C_READY
 
         return complete
 
@@ -350,7 +358,7 @@ class Worktree(object):
         if self._reuse:
             jobstate = self.check()
             to_run = [jn for jn, finished in jobstate.items()
-                      if finished != 1]
+                      if finished != C_COMPLETE]
         running = []
 
         # How many at once?
@@ -367,7 +375,7 @@ class Worktree(object):
 
                 # Remove CASTEP and any error files
                 to_rm = glob.glob(job.seed + '.*.err')
-                to_rm += [job.seed + '.castep']
+                to_rm += [job.castep]
 
                 for f in to_rm:
                     try:
@@ -391,14 +399,65 @@ class Worktree(object):
                 # Wait for one to finish...
                 jobstate = self.check(running)
                 # Which ones are finished?
-                complete = [jn for jn, finished in jobstate.items()
-                            if finished > 0]
-                for jn in complete:
-                    print('Job {0} complete.'.format(jn))
+                complete = [(jn, finished) for jn, finished
+                            in jobstate.items()
+                            if finished != C_READY]
+                for jn, res in complete:
+                    print('Job {0} completed {1}.'.format(jn,
+                                                          'successfully'
+                                                          if res == 1 else
+                                                          'with an error'))
                     running.remove(jn)
                 time.sleep(1)
 
-    
+    def read_data(self):
+
+        # Read the output from all completed jobs
+        jobstate = self.check()
+
+        jobdata = {
+            'E': {},
+            'F': {},
+            'S': {}
+        }
+
+        def get_vals(c):
+            nrg = c._energy_total
+            frc = c._forces
+            strs = c._stress
+
+            return nrg, frc, strs
+
+        for name, job in self._worktree.items():
+            if jobstate[name] != C_COMPLETE:
+                # Job isn't finished
+                jobdata[name] = None
+                continue
+
+            ccalc = Castep(keyword_tolerance=3)
+
+            ccalc.read(job.castep)
+            nrg, frc, strs = get_vals(ccalc)
+
+            jobdata['E'][name] = nrg
+            jobdata['F'][name] = sum(np.linalg.norm(frc, axis=1))
+            jobdata['S'][name] = np.linalg.norm(strs)
+
+        # Organise it by ranges
+        wtree = self._worktree
+        data_curves = {}
+        for X, jobrange in self._ranges.items():
+            data_curves[X] = {'values': np.array([wtree[j].values[X]
+                                                  for j in jobrange]),
+                              'labels': [wtree[j].labels[X]
+                                         for j in jobrange],
+                              'Ys': {}
+                              }
+            for Y, data in jobdata.items():
+                data_curves[X]['Ys'][Y] = np.array([data[j]
+                                                    for j in jobrange])
+
+        return data_curves
 
 
 """
@@ -447,18 +506,16 @@ def main(seedname, cmdline_task):
     task = cmdline_task if cmdline_task is not None else convpars['ctsk']
 
     # Now open the base cell and param files
-    if (task in ('input', 'inputrun', 'all')):
+    cname = '{0}.cell'.format(seedname)
+    print('Reading ' + cname)
 
-        cname = '{0}.cell'.format(seedname)
-        print('Reading ' + cname)
+    # Necessary because of ASE's annoying messages...
+    cfile = read_castep_cell(open(cname),
+                             calculator_args={'keyword_tolerance': 3})
 
-        # Necessary because of ASE's annoying messages...
-        cfile = read_castep_cell(open(cname),
-                                 calculator_args={'keyword_tolerance': 3})
-
-        pname = '{0}.param'.format(seedname)
-        print('Reading ' + pname)
-        read_param(pname, calc=cfile.calc)
+    pname = '{0}.param'.format(seedname)
+    print('Reading ' + pname)
+    read_param(pname, calc=cfile.calc)
 
     print('')
 
@@ -542,9 +599,18 @@ def main(seedname, cmdline_task):
     ### PHASE 2: Running ###
     if task in ('inputrun', 'all'):
 
-        print(wtree.check())
-
         wtree.run(convpars['rcmd'])
+
+    ### PHASE 3: Output processing ###
+    if task in ('output', 'all'):
+
+        data_curves = wtree.read_data()
+
+        write_dat(basename, data_curves, basename + _out_dir)
+
+        print(data_curves)
+
+        gp_plot(basename, data_curves, basename + _out_dir)
 
 
 if __name__ == '__main__':

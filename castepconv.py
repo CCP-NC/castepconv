@@ -415,11 +415,7 @@ class Worktree(object):
         # Read the output from all completed jobs
         jobstate = self.check()
 
-        jobdata = {
-            'E': {},
-            'F': {},
-            'S': {}
-        }
+        jobdata = OrderedDict([('E', {}), ('F', {}), ('S', {})])
 
         def get_vals(c):
             nrg = c._energy_total
@@ -440,18 +436,18 @@ class Worktree(object):
             nrg, frc, strs = get_vals(ccalc)
 
             jobdata['E'][name] = nrg
-            jobdata['F'][name] = sum(np.linalg.norm(frc, axis=1))
+            jobdata['F'][name] = max(np.linalg.norm(frc, axis=1))
             jobdata['S'][name] = np.linalg.norm(strs)
 
         # Organise it by ranges
         wtree = self._worktree
-        data_curves = {}
+        data_curves = OrderedDict()
         for X, jobrange in self._ranges.items():
             data_curves[X] = {'values': np.array([wtree[j].values[X]
                                                   for j in jobrange]),
                               'labels': [wtree[j].labels[X]
                                          for j in jobrange],
-                              'Ys': {}
+                              'Ys': OrderedDict()
                               }
             for Y, data in jobdata.items():
                 data_curves[X]['Ys'][Y] = np.array([data[j]

@@ -220,6 +220,10 @@ def write_dat(seedname, data_curves, cwd='.'):
     for xtype, xdata in data_curves.items():
 
         data = [xdata['values']]
+        if len(data[0]) == 0:
+            # No data
+            continue
+
         if xtype == 'kpn':
             data = [np.prod(xdata['values'], axis=1)]
 

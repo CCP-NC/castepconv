@@ -74,7 +74,8 @@ def parse_cmd_args():
     task = {'i': 'input', 'c': 'clear', 'ir': 'inputrun', 'o': 'output',
             'a': 'all'}.get(task)
 
-    return seed, task       
+    return seed, task
+
 
 def warn(msg):
     """Print a highlighted warning"""

@@ -20,6 +20,7 @@ from __future__ import unicode_literals
 import os
 import sys
 import time
+import glob
 import json
 import pickle
 import shutil
@@ -277,6 +278,8 @@ class Worktree(object):
 
         set_vals(a, **self._basevals)
 
+        prevjob = None
+
         for name, job in self._worktree.items():
 
             set_vals(a, **job.values)
@@ -291,11 +294,23 @@ class Worktree(object):
                 print('Reusing files for {0}'.format(job.seed))
                 continue
 
+            if self._sreuse:
+                a.calc.param.write_checkpoint = 'ALL'
+                if prevjob is not None:
+                    a.calc.param.continuation = prevjob.name + '.check'
+
             print('Writing files for {0}'.format(job.seed))
             write_castep_cell(open(job.cell, 'w'), a)
             write_param(job.param, a.calc.param, force_write=True)
 
+            prevjob = job
+
     def check(self, names=None):
+        """Status code:
+        0 - still only running
+        1 - complete
+        2 - error
+        """
 
         # Our token to find the end of the file
         endstr = 'Total time          ='
@@ -306,21 +321,25 @@ class Worktree(object):
         # Check if the jobs in the worktree are complete or not
         complete = OrderedDict()
         for name in names:
+
+            complete[name] = 0  # Default
+
             job = self._worktree[name]
             castf = job.seed + '.castep'
+            errf = glob.glob(job.seed + '.*.err')
+
+            if len(errf) > 0:
+                complete[name] = 2
+                continue
 
             end_i = -1
             try:
                 castlines = open(castf).readlines()
+                has_end = any(map(lambda l: endstr in l, castlines[-10:]))
             except IOError:
-                complete[name] = False
                 continue
 
-            for i, l in enumerate(castlines):
-                if endstr in l:
-                    end_i = i
-
-            complete[name] = end_i > len(castlines) - 10 # Towards the end...
+            complete[name] = 1 if has_end else 0
 
         return complete
 
@@ -330,7 +349,8 @@ class Worktree(object):
         to_run = self._worktree.keys()
         if self._reuse:
             jobstate = self.check()
-            to_run = [jn for jn, finished in jobstate.items() if not finished]
+            to_run = [jn for jn, finished in jobstate.items()
+                      if finished != 1]
         running = []
 
         # How many at once?
@@ -344,6 +364,16 @@ class Worktree(object):
                 # Push another!
                 name = to_run.pop(0)
                 job = self._worktree[name]
+
+                # Remove CASTEP and any error files
+                to_rm = glob.glob(job.seed + '.*.err')
+                to_rm += [job.seed + '.castep']
+
+                for f in to_rm:
+                    try:
+                        os.remove(f)
+                    except OSError:
+                        pass
 
                 cmd_line, stdin, stdout = compile_cmd_line(
                     name, castep_command)
@@ -362,11 +392,13 @@ class Worktree(object):
                 jobstate = self.check(running)
                 # Which ones are finished?
                 complete = [jn for jn, finished in jobstate.items()
-                            if finished]
+                            if finished > 0]
                 for jn in complete:
                     print('Job {0} complete.'.format(jn))
                     running.remove(jn)
                 time.sleep(1)
+
+    
 
 
 """

@@ -20,21 +20,28 @@ from __future__ import unicode_literals
 import os
 import numpy as np
 from cconv import utils
+from collections import OrderedDict
 
 ## Default properties ##
 
 _x_types = {
     'cut': {
         'xlabel': 'Cut Off Energy (eV)',
-        'title': 'Convergence vs. plane wave cut off'
+        'title': 'Convergence vs. plane wave cut off',
+        'name': 'cut off energy',
+        'unit': 'eV'
     },
     'kpn': {
         'xlabel': 'K-Points Grid',
-        'title': 'Convergence vs. k-points'
+        'title': 'Convergence vs. k-points',
+        'name': 'k-points grid',
+        'unit': ''
     },
     'fgm': {
         'xlabel': 'Fine Gmax (eV)',
-        'title': 'Convergence vs. fine grid cut off'
+        'title': 'Convergence vs. fine grid cut off',
+        'name': 'fine Gmax',
+        'unit': 'eV'
     }
 }
 
@@ -43,19 +50,25 @@ _y_types = {
         'set': 0,
         'lc': 1,
         'col': 2,
-        'legend': 'Final energy (eV)'
+        'legend': 'Final energy (eV)',
+        'name': 'final energy',
+        'unit': 'eV'
     },
     'F': {
         'set': 1,
         'lc': 2,
         'col': 3,
-        'legend': 'Max force ({scale} ev/Ang)'
+        'legend': 'Max force ({scale} ev/Ang)',
+        'name': 'forces',
+        'unit': 'eV/Ang'
     },
     'S': {
         'set': 2,
         'lc': 3,
         'col': 4,
-        'legend': 'Stress (norm, {scale} GPa)'
+        'legend': 'Stress (norm, {scale} GPa)',
+        'name': 'stresses',
+        'unit': 'GPa'
     }
 }
 
@@ -276,3 +289,75 @@ def agr_plot(seedname, data_curves, cwd='.'):
                                                               xtype)),
                   'w') as f:
             f.write(agr_file)
+
+
+def write_dat(seedname, data_curves, cwd='.'):
+
+    columns = ['X', 'E', 'F', 'S']
+
+    for xtype, xdata in data_curves.items():
+
+        data = [xdata['values']]
+        if len(data[0]) == 0:
+            # No data
+            continue
+
+        if xtype == 'kpn':
+            data = [np.prod(xdata['values'], axis=1)]
+
+        data += [xdata['Ys'][y] for y in columns[1:]]
+        data = np.array(data).T
+
+        np.savetxt(open(os.path.join(cwd,
+                                     '{0}_{1}_conv.dat'.format(seedname,
+                                                               xtype)), 'w'),
+                   data)
+
+
+def write_report(seedname, data_curves, Etol=1e-3, Ftol=1e-1, Stol=1e-1,
+                 cwd='.'):
+
+    tols = OrderedDict(zip(['E', 'F', 'S'], [Etol, Ftol, Stol]))
+
+    report = ''
+    for ytype, tol in tols.items():
+        report += ('Tolerance on {Y}: {tol} {unit}\n'
+                   ).format(Y=_y_types[ytype]['name'],
+                            tol=tol, unit=_y_types[ytype]['unit'])
+
+    for xtype, xdata in data_curves.items():
+
+        if len(xdata['values']) == 0:
+            continue
+
+        for ytype, yvals in xdata['Ys'].items():
+
+            tol = tols[ytype]
+            yerr = np.abs(yvals-yvals[-1])
+            if (max(yerr) == min(yerr)):
+                continue
+            # Find converged streak
+            conv_i = np.where(np.cumprod(yerr[::-1] < tol)[::-1] == 1)[0]
+            try:
+                conv_i = conv_i[0]
+            except IndexError:
+                conv_i = -1  # No convergence
+            if conv_i == -1:
+                report += ('Convergence of {X} with {Y} not found.'
+                           'Increase tolerance or extend tested range.\n'
+                           ).format(
+                    X=_x_types[xtype]['name'], Y=_y_types[ytype]['name'])
+            else:
+                conv_x = xdata['labels'][conv_i]
+
+                report += ('Based on {Y}, suggested value for {X} is {conv} '
+                           '{unit}\n').format(X=_x_types[xtype]['name'],
+                                              Y=_y_types[ytype]['name'],
+                                              conv=conv_x,
+                                              unit=_x_types[xtype]['unit'])
+
+    print('')
+    print(report)
+
+    with open(os.path.join(cwd, '{0}_report.txt'.format(seedname)), 'w') as f:
+        f.write(report)

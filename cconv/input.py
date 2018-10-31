@@ -211,26 +211,3 @@ def parse_convfile(cfile=''):
     param_check(params)
 
     return params
-
-
-def write_dat(seedname, data_curves, cwd='.'):
-
-    columns = ['X', 'E', 'F', 'S']
-
-    for xtype, xdata in data_curves.items():
-
-        data = [xdata['values']]
-        if len(data[0]) == 0:
-            # No data
-            continue
-
-        if xtype == 'kpn':
-            data = [np.prod(xdata['values'], axis=1)]
-
-        data += [xdata['Ys'][y] for y in columns[1:]]
-        data = np.array(data).T
-
-        np.savetxt(open(os.path.join(cwd,
-                                     '{0}_{1}_conv.dat'.format(seedname,
-                                                               xtype)), 'w'),
-                   data)

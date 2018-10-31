@@ -33,8 +33,8 @@ from ase.io.castep import (read_castep_cell, read_param, write_castep_cell,
                            write_param)
 
 from cconv import utils
-from cconv.io import parse_convfile, write_dat
-from cconv.plot import gp_plot, agr_plot
+from cconv.input import parse_convfile
+from cconv.output import gp_plot, agr_plot, write_dat, write_report
 
 __version__ = "2.0"
 
@@ -605,6 +605,10 @@ def main(seedname, cmdline_task):
         print('Writing output to ' + basename + _out_dir)
 
         write_dat(basename, data_curves, basename + _out_dir)
+
+        write_report(basename, data_curves, convpars['nrgtol'],
+                     convpars['fortol'], convpars['strtol'],
+                     basename + _out_dir)
 
         if convpars['outp'] == 'gnuplot':
             gp_plot(basename, data_curves, basename + _out_dir)

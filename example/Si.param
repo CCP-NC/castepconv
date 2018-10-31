@@ -1,2 +1,3 @@
 finite_basis_spacing:	30
-fix_occupancy=	true
+fix_occupancy:	true
+max_scf_cycles:	60

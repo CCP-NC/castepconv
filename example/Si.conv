@@ -6,7 +6,7 @@ running_command: castep.serial <seedname>
 
 # The final graphs can be plotted in XMGrace rather than Gnuplot if desired
 #
-# output_type:	  grace
+output_type:	  grace
 
 # If you give a dryrun command, it will be used to test the input fiels as well as generate pseudopotentials and then use them for all future calculations
 #
@@ -14,8 +14,8 @@ running_command: castep.serial <seedname>
 
 # These parameters, if uncommented, allow you to control the range of cutoff energies and kpoints for your convergence
 #
-# cutoff_min:     200
-# cutoff_max:     1000
+# cutoff_min:     500
+# cutoff_max:     900
 # cutoff_step:	  200
 # kpoint_n_min:   1
 # kpoint_n_max:   9
@@ -30,7 +30,7 @@ running_command: castep.serial <seedname>
 
 # This allows you to displace slightly the atoms from their equilibrium positions in order to introduce a non-zero force to converge in the system
 #
-# displace_atoms: 0.05
+displace_atoms: 0.05
 
 # Uncommenting this line, results from previous runs may be "recycled" and reused for the new ones.
 # Use with care - any modifications to the .conv_tab or the .param files could cause undetectable discrepancies!

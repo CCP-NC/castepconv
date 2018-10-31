@@ -34,7 +34,7 @@ from ase.io.castep import (read_castep_cell, read_param, write_castep_cell,
 
 from cconv import utils
 from cconv.io import parse_convfile, write_dat
-from cconv.plot import gp_plot
+from cconv.plot import gp_plot, agr_plot
 
 __version__ = "2.0"
 
@@ -213,8 +213,8 @@ class Worktree(object):
     def __init__(self, basename, convpars, convranges):
 
         self._has_fgm = convranges['fgm']['values'][0] is not None
-        jobstr = 'cut_{cut}_kpn_{kpn}' + ('_fgm_{fgm}'
-                                          if self._has_fgm else '')
+        jobstr = '{base}_cut_{cut}_kpn_{kpn}' + ('_fgm_{fgm}'
+                                                 if self._has_fgm else '')
 
         self._reuse = convpars['rcalc']
         self._sreuse = convpars['sruse']
@@ -247,7 +247,7 @@ class Worktree(object):
                 joblabels[key] = crange['labels'][v_i]
 
                 # Name?
-                jobname = jobstr.format(**joblabels)
+                jobname = jobstr.format(base=basename, **joblabels)
 
                 self._ranges[key].append(jobname)
 
@@ -602,11 +602,14 @@ def main(seedname, cmdline_task):
 
         data_curves = wtree.read_data()
 
+        print('Writing output to ' + basename + _out_dir)
+
         write_dat(basename, data_curves, basename + _out_dir)
 
-        print(data_curves)
-
-        gp_plot(basename, data_curves, basename + _out_dir)
+        if convpars['outp'] == 'gnuplot':
+            gp_plot(basename, data_curves, basename + _out_dir)
+        elif convpars['outp'] == 'grace':
+            agr_plot(basename, data_curves, basename + _out_dir)
 
 
 if __name__ == '__main__':

@@ -1,6 +1,7 @@
 \documentclass[10pt]{article}
 \usepackage{listings}
 \usepackage{lmodern}
+\usepackage{hyperref}
 
 \title{CASTEP convergence automation tool 1.0 User Guide}
 \author{Simone Sturniolo}
@@ -26,11 +27,23 @@ To install the script on Linux or CygWin just open a terminal, navigate to the
 folder containing the files, and type:
 
 \begin{lstlisting}[language=Bash]
- user@machine:~$ sudo python setup.py install
+ user@machine:~$ pip install . --user
 \end{lstlisting}
 
-Enter your password as prompted and the script will be installed and available 
-as a command.
+If \texttt{pip} is not available on your system, this alternative method can be
+used, but it's advised to avoid it unless necessary:
+
+\begin{lstlisting}[language=Bash]
+ user@machine:~$ python setup.py install --user
+\end{lstlisting}
+
+CASTEPconv depends on a number of external Python libraries. Installing with 
+\texttt{pip} will handle these dependencies automatically. The alternative is
+to install them by hand. The dependencies are \texttt{numpy}, the main numerical
+library for Python (often coming pre-installed in many distributions of the
+language) and the Atomic Simulation Environment, or ASE. This can be found in
+the Python Package Index or downloaded and installed from its repository at
+\url{https://wiki.fysik.dtu.dk/ase/index.html}.
 
 \section{Usage}
 
@@ -49,7 +62,8 @@ criteria for SCF iterations, add dispersion correction etc.), a \textless
 \textit{seedname}\textgreater.param file can be added in the same folder with 
 these options. To control the convergence job itself, instead, a new file, 
 \textless \textit{seedname}\textgreater.conv, is needed.\newline
-Options before the seedname can be used to quickly override settings in the .conv file. At the moment only one option is accepted, to override the \textbf{convergence\_task} keyword (see ``Options'' section).
+Options before the seedname can be used to quickly override settings in the .conv file.
+At the moment only one option is accepted, to override the \textbf{convergence\_task} keyword (see ``Options'' section).
 
 \section{Fine grid convergence (added in version 0.9.5)}
 
@@ -218,6 +232,11 @@ False.\newline
 means the serial reuse is employed. Anything else will be interpreted as 
 False.\newline
 
+\textbf{castep\_8plus}: Whether the files should be prepared for CASTEP 8.0 or higher. Allows to use certain keywords that will make the output take less space needlessly but also were not available in previous versions. Default is True.\newline
+\textit{Legal values}: Anything. The word ``true'', regardless of the case, 
+means that input is prepared for CASTEP 8.0 or higher. Anything else will be interpreted as 
+False.\newline
+
 \section{Options}
 
 At the moment, CASTEPconv allows only for one command-line option. The option \textit{-t} allows one to quickly override the \textbf{convergence\_task} keyword in the conv file with another task of choice, using one of the following values as argument: \textit{i, ir, o, c, a} standing respectively for Input, InputRun, Output, Clean and All. For example, to quickly clear the previously written files before restarting a calculation one can quickly issue the command:
@@ -229,15 +248,8 @@ At the moment, CASTEPconv allows only for one command-line option. The option \t
 \section{Output}
 
 When the calculations are over, CASTEPconv will have produced the following 
-files:
-
-\textbf{\textless \textit{seedname}\textgreater.conv\_tab}: this file is created 
-during the INPUT phase of the run (when folders and input files for the 
-calculations are created) and sums up the values used for cutoff and the kpoint 
-grids employed in the various files. This is just useful as a memo, and mostly 
-used to resume analysis of previously ran calculations (by using the OUTPUT 
-convergence\_task) - if it's not present, the ranges will be recalculated from 
-the .conv file.
+files, stored in the \textbf{\textless \textit{seedname}\textgreater\_cconv\_out}
+folder.
 
 \textbf{\textless \textit{seedname}\textgreater\_cut\_conv.dat}: generated in 
 the OUTPUT phase of the run, will contain a tabulated ASCII of cutoff values (in 
@@ -260,13 +272,18 @@ expresses its quantities as a function of the fine Gmax, when this type of conve
 values will be expressed both in eV (first column) and 1/Angstroms (last column); the latter values are useful
 because they represent the units currently accepted by CASTEP in .param files.
 
-\textbf{\textless \textit{seedname}\textgreater\_conv.\textless variable 
-extension\textgreater}: this file is the script meant for generation of graphic 
-output. By default it will be a Gnuplot script (extension .gp). When other forms 
-of output will be supported, choosing the appropriate value for the output\_type 
-option will replace it with a different format.
+\textbf{\textless \textit{seedname}\textgreater\_cut\_conv.\textless variable extension\textgreater}: this file is the script meant for generation of graphic 
+output. By default it will be a Gnuplot script (extension .gp). Choosing the
+appropriate value for the output\_type option will replace it with a different format.
 
-\textbf{\textless \textit{seedname}\textgreater\_report.txt}: only in version 0.9.5 and higher. This file contains a printout of the same suggestions for the optimal convergence values that will be printed on the standard output, for future reference.
+\textbf{\textless \textit{seedname}\textgreater\_kp\_conv.\textless variable extension\textgreater}: plotting file for k-point convergence (see above).
+
+\textbf{\textless \textit{seedname}\textgreater\_fgm\_conv.\textless variable extension\textgreater}: plotting file for fine Gmax convergence (see above).
+
+\textbf{\textless \textit{seedname}\textgreater\_report.txt}: only in version
+0.9.5 and higher. This file contains a printout of the same suggestions for
+the optimal convergence values that will be printed on the standard output,
+for future reference.
 
 Besides this, CASTEPconv produces a bit of textual output to suggest which 
 minimum values of cutoff, k-point grid and in case fine Gmax might be the best. This is done by 

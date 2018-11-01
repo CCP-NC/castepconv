@@ -230,7 +230,7 @@ class Worktree(object):
             self._baselabels[key] = crange['labels'][0]
 
         self._worktree = OrderedDict()
-        self._ranges = {}  # Store the jobs for each range
+        self._ranges = OrderedDict()  # Store the jobs for each range
 
         for key, crange in convranges.items():
 
@@ -427,7 +427,7 @@ class Worktree(object):
         for name, job in self._worktree.items():
             if jobstate[name] != C_COMPLETE:
                 # Job isn't finished
-                jobdata[name] = None
+                utils.warn('Results for {0} missing, skipping.'.format(name))
                 continue
 
             ccalc = Castep(keyword_tolerance=3)
@@ -443,15 +443,17 @@ class Worktree(object):
         wtree = self._worktree
         data_curves = OrderedDict()
         for X, jobrange in self._ranges.items():
+            # Get an effective jobrange
+            jobcomplete = [j for j in jobrange if jobstate[j] == C_COMPLETE]
             data_curves[X] = {'values': np.array([wtree[j].values[X]
-                                                  for j in jobrange]),
+                                                  for j in jobcomplete]),
                               'labels': [wtree[j].labels[X]
-                                         for j in jobrange],
+                                         for j in jobcomplete],
                               'Ys': OrderedDict()
                               }
             for Y, data in jobdata.items():
                 data_curves[X]['Ys'][Y] = np.array([data[j]
-                                                    for j in jobrange])
+                                                    for j in jobcomplete])
 
         return data_curves
 

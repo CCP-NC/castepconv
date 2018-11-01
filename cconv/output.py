@@ -328,6 +328,8 @@ def write_report(seedname, data_curves, Etol=1e-3, Ftol=1e-1, Stol=1e-1,
     for xtype, xdata in data_curves.items():
 
         if len(xdata['values']) == 0:
+            utils.warn('No data available for convergence of ' +
+                       _x_types[xtype]['name'])
             continue
 
         for ytype, yvals in xdata['Ys'].items():

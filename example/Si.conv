@@ -6,7 +6,7 @@ running_command: castep.serial <seedname>
 
 # The final graphs can be plotted in XMGrace rather than Gnuplot if desired
 #
-output_type:	  grace
+# output_type:	  grace
 
 # If you give a dryrun command, it will be used to test the input fiels as well as generate pseudopotentials and then use them for all future calculations
 #

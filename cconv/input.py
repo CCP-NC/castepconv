@@ -32,6 +32,10 @@ def parsestr(v):
     return str(v).lower().strip()
 
 
+def parsepath(v):
+    return str(v).strip()
+
+
 class ConvPar(object):
     """A definition of a convergence parameter"""
 
@@ -87,12 +91,11 @@ _conv_parameters = {
                            validoptions=['gnuplot', 'grace']),
     'fine_gmax_mode': ConvPar('fine_gmax_mode', 'fgmmode', parsestr,
                               validoptions=['min', 'max']),
-    # The following must be taken without any modification, so we don't use
-    # parsestr
-    'running_command': ConvPar('running_command', 'rcmd', str,
+    # The following are case sensitive, so we don't use parsestr
+    'running_command': ConvPar('running_command', 'rcmd', parsepath,
                                'castep <seedname> -dryrun'),
-    'dryrun_command': ConvPar('dryrun_command', 'drcmd', str),
-    'submission_script': ConvPar('submission_script', 'subs', str),
+    'dryrun_command': ConvPar('dryrun_command', 'drcmd', parsepath),
+    'submission_script': ConvPar('submission_script', 'subs', parsepath),
     # Float parameters
     #   eV
     'cutoff_min': ConvPar('cutoff_min', 'cutmin', float, 400.0,

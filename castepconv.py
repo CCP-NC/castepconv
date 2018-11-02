@@ -220,6 +220,7 @@ class Worktree(object):
         self._sreuse = convpars['sruse']
         self._runmode = convpars['rmode']
         self._maxjobs = convpars['maxjobs']
+        self._sscript = convpars['subs']
 
         # The 'base' values for each structure (first of each range)
         self._basevals = OrderedDict()
@@ -302,6 +303,12 @@ class Worktree(object):
                 # If files exist and we shouldn't overwrite, skip
                 print('Reusing files for {0}'.format(job.seed))
                 continue
+
+            if self._sscript:
+                script = open(self._sscript).read()
+                script = script.replace('<seedname>', name)
+                with open(job.seed, 'w') as outf:
+                    outf.write(script)
 
             if self._sreuse:
                 a.calc.param.write_checkpoint = 'ALL'

@@ -217,8 +217,8 @@ class Worktree(object):
                                                  if self._has_fgm else '')
 
         self._reuse = convpars['rcalc']
-        self._sreuse = convpars['sruse']
         self._runmode = convpars['rmode']
+        self._sreuse = convpars['sruse'] and self._runmode == 'serial'
         self._maxjobs = convpars['maxjobs']
         self._sscript = convpars['subs']
 
@@ -358,7 +358,7 @@ class Worktree(object):
 
         return complete
 
-    def run(self, castep_command='castep <seedname>'):
+    def run(self, castep_command='castep <seedname>', wait=True):
 
         # First, which ones are to run?
         to_run = self._worktree.keys()
@@ -375,7 +375,7 @@ class Worktree(object):
 
         # Now start running
         while len(to_run) > 0 or len(running) > 0:
-            if len(running) < maxjobs:
+            if len(running) < maxjobs and len(to_run) > 0:
                 # Push another!
                 name = to_run.pop(0)
                 job = self._worktree[name]
@@ -401,8 +401,9 @@ class Worktree(object):
                 print('Running job {0}...'.format(name))
                 sp.Popen(cmd_line, stdin=stdin, stdout=stdout, cwd=job.dir)
 
-                running.append(name)
-            else:
+                if wait:
+                    running.append(name)  # If not we're just launching all
+            elif wait:
                 # Wait for one to finish...
                 jobstate = self.check(running)
                 # Which ones are finished?
@@ -604,7 +605,9 @@ def main(seedname, cmdline_task):
     ### PHASE 2: Running ###
     if task in ('inputrun', 'all'):
 
-        wtree.run(convpars['rcmd'])
+        # Not waiting only makes sense for inputrun
+        wait = convpars['jwait'] or (task == 'all')
+        wtree.run(convpars['rcmd'], wait)
 
     ### PHASE 3: Output processing ###
     if task in ('output', 'all'):

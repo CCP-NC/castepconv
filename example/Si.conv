@@ -3,6 +3,8 @@
 
 convergence_task: all
 running_command: castep.serial <seedname>
+running_mode:	parallel
+max_parallel_jobs:	2
 
 # The final graphs can be plotted in XMGrace rather than Gnuplot if desired
 #
@@ -30,7 +32,7 @@ running_command: castep.serial <seedname>
 
 # This allows you to displace slightly the atoms from their equilibrium positions in order to introduce a non-zero force to converge in the system
 #
-displace_atoms: 0.05
+# displace_atoms: 0.05
 
 # Uncommenting this line, results from previous runs may be "recycled" and reused for the new ones.
 # Use with care - any modifications to the .conv_tab or the .param files could cause undetectable discrepancies!

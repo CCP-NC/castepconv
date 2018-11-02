@@ -220,6 +220,15 @@ False.\newline
 means the stresses are calculated. Anything else will be interpreted as 
 False.\newline
 
+\textbf{job\_wait}: Wait for jobs to be completed before running the next ones.
+Only makes sense to set to False when the task is INPUTRUN, and one wants to 
+launch all calculations at once. Careful if using serial mode, because in 
+combination with serial\_reuse this will likely fail (as the .check files will
+not be ready in time). Ignored if the task is ALL. Default is True.\newline
+\textit{Legal values}: Anything. The word ``true'', regardless of the case, 
+means the stresses are calculated. Anything else will be interpreted as 
+False.\newline
+
 \textbf{reuse\_calcs}: If results from a previous convergence are present, 
 recycle them when possible. This requires the .conv\_tab file from the previous 
 calculation to be unaltered. Default is False.\newline

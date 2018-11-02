@@ -131,6 +131,7 @@ _conv_parameters = {
     'max_parallel_jobs': ConvPar('max_parallel_jobs', 'maxjobs', int, 0,
                                  validrange=[-1, None]),
     # Boolean parameters
+    'job_wait': ConvPar('job_wait', 'jwait', parsebool, True),
     'converge_stress': ConvPar('converge_stress', 'cnvstr', parsebool, False),
     'reuse_calcs': ConvPar('reuse_calcs', 'rcalc', parsebool, False),
     'serial_reuse': ConvPar('serial_reuse', 'sruse', parsebool, True),

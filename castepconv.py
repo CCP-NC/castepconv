@@ -15,7 +15,7 @@ from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
 
-"""Main script"""
+# Main script
 
 import os
 import sys
@@ -166,6 +166,8 @@ def add_castepopts(a, c8p=True):
     a.calc.cell._options['symmetry_generate'] = sgen
     kpmp = CastepOption('kpoints_mp_grid', 'B', 'integer vector', [1, 1, 1])
     a.calc.cell._options['kpoints_mp_grid'] = kpmp
+    kpoff = CastepOption('kpoints_mp_offset', 'B', 'real vector')
+    a.calc.cell._options['kpoints_mp_offset'] = kpoff
 
     if c8p:
         # This is only valid for Castep 8+
@@ -221,6 +223,7 @@ class Worktree(object):
         self._sreuse = convpars['sruse'] and self._runmode == 'serial'
         self._maxjobs = convpars['maxjobs']
         self._sscript = convpars['subs']
+        self._gamma = convpars['gamma']
 
         # The 'base' values for each structure (first of each range)
         self._basevals = OrderedDict()
@@ -283,6 +286,10 @@ class Worktree(object):
         def set_vals(a, cut, kpn, fgm):
             a.calc.param.cut_off_energy = cut
             a.calc.cell.kpoints_mp_grid = kpn
+            if self._gamma:
+                # Compute the necessary offset for the gamma point
+                offset = [0 if k%2 == 1 else 1.0/(2*k) for k in kpn]
+                a.calc.cell.kpoints_mp_offset = offset
             if fgm is not None:
                 a.calc.param.fine_gmax = fgm
 
@@ -349,6 +356,7 @@ class Worktree(object):
 
             end_i = -1
             try:
+                print(job.castep)
                 castlines = open(job.castep).readlines()
                 has_end = any(map(lambda l: endstr in l, castlines[-10:]))
             except IOError:
@@ -551,8 +559,13 @@ def main(seedname, cmdline_task):
     cfile.calc.param.calculate_stress = convpars['cnvstr']
 
     # Clean up all references to kpoints
-    for k in ('kpoints_mp_grid', 'kpoint_mp_grid', 'kpoints_mp_spacing',
-              'kpoint_mp_spacing', 'kpoints_list', 'kpoint_list'):
+    kclean = ['kpoints_mp_grid', 'kpoint_mp_grid', 'kpoints_mp_spacing',
+              'kpoint_mp_spacing', 'kpoints_list', 'kpoint_list']
+    # These, clean up only in the presence of the relevant option
+    if convpars['gamma']:
+        kclean += ['kpoints_mp_offset', 'kpoint_mp_offset']
+
+    for k in kclean:
         cfile.calc.cell.__setattr__(k, None)
 
     # Get the kpoint basis

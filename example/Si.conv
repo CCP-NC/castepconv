@@ -3,8 +3,6 @@
 
 convergence_task: all
 running_command: castep.serial <seedname>
-running_mode:	parallel
-max_parallel_jobs:	2
 
 # The final graphs can be plotted in XMGrace rather than Gnuplot if desired
 #
@@ -22,6 +20,9 @@ max_parallel_jobs:	2
 # kpoint_n_min:   1
 # kpoint_n_max:   9
 # kpoint_n_step:  2
+
+# This forces all .cell files to include a kpoint grid offset such that the gamma point will always be part of the grid
+# include_gamma:  true
 
 # This makes the final estimate a bit more tolerant on energies
 # final_energy_delta:	0.00001

@@ -19,3 +19,5 @@ symmetry_generate
 
 %BLOCK SPECIES_POT
 %ENDBLOCK SPECIES_POT
+
+kpoint_mp_offset 0.3 0.3 0.3

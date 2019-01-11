@@ -218,12 +218,13 @@ def agr_plot(seedname, data_curves, cwd='.'):
     for xtype, xdata in data_curves.items():
 
         xvals = xdata['values']
-        if xtype == 'kpn':
-            xvals = np.prod(xvals, axis=1)
 
         if len(xvals) == 0:
             # No data
             continue
+
+        if xtype == 'kpn':
+            xvals = np.prod(xvals, axis=1)
 
         xrng = (np.amin(xvals),
                 np.amax(xvals))

@@ -16,7 +16,7 @@ if __name__ == "__main__":
           scripts=['castepconv.py'],
           install_requires=[
               'numpy',
-              'ase'
+              'ase>=3.17'
           ],
           python_requires='>=2.6'
           )

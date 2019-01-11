@@ -11,22 +11,28 @@ import tempfile
 
 # To import castepconv, set the parent directory in the PYTHONPATH
 sys.path = [os.path.abspath('../')] + sys.path
-import cconv
-from cconv.io import ConvPar, ConvError, parse_convfile, parsestr, parsebool
 
 
 class ConvfileTests(unittest.TestCase):
 
     def test_parsebool(self):
+
+        from cconv.input import parsebool
+
         self.assertTrue(parsebool('TRUE'))
         self.assertTrue(parsebool('T'))
         self.assertFalse(parsebool('F'))
 
     def test_parsestr(self):
+
+        from cconv.input import parsestr
+
         self.assertEqual(parsestr(' this AND tHaT  '),
                          'this and that')
 
     def test_convpar(self):
+
+        from cconv.input import ConvPar, parsestr
 
         cp = ConvPar('number', 'n', float, 1.0, validrange=(0, 2))
 
@@ -44,6 +50,8 @@ class ConvfileTests(unittest.TestCase):
             cp.parse('test')
 
     def test_parseconv(self):
+
+        from cconv.input import parse_convfile, ConvError
 
         # Create a mock convfile
         mock_file = """

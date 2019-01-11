@@ -246,6 +246,11 @@ False.\newline
 means that input is prepared for CASTEP 8.0 or higher. Anything else will be interpreted as 
 False.\newline
 
+\textbf{include\_gamma}: Whether a k-point grid offset should be included in each file in order to make sure that the gamma point is always present in the k-point grid. Default is False.\newline
+\textit{Legal values}: Anything. The word ``true'', regardless of the case, 
+means that input is prepared for CASTEP 8.0 or higher. Anything else will be interpreted as 
+False.\newline
+
 \section{Options}
 
 At the moment, CASTEPconv allows only for one command-line option. The option \textit{-t} allows one to quickly override the \textbf{convergence\_task} keyword in the conv file with another task of choice, using one of the following values as argument: \textit{i, ir, o, c, a} standing respectively for Input, InputRun, Output, Clean and All. For example, to quickly clear the previously written files before restarting a calculation one can quickly issue the command:

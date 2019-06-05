@@ -369,7 +369,7 @@ class Worktree(object):
     def run(self, castep_command='castep <seedname>', wait=True):
 
         # First, which ones are to run?
-        to_run = self._worktree.keys()
+        to_run = list(self._worktree.keys())
         if self._reuse:
             jobstate = self.check()
             to_run = [jn for jn, finished in jobstate.items()

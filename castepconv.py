@@ -356,7 +356,6 @@ class Worktree(object):
 
             end_i = -1
             try:
-                print(job.castep)
                 castlines = open(job.castep).readlines()
                 has_end = any(map(lambda l: endstr in l, castlines[-10:]))
             except IOError:

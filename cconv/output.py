@@ -1,5 +1,9 @@
 #!/usr/bin/env python
 
+from collections import OrderedDict
+from cconv import utils
+import numpy as np
+import os
 """
 CASTEP convergence automation tool
 by Simone Sturniolo
@@ -17,10 +21,6 @@ from __future__ import unicode_literals
 
 """Plotting functions"""
 
-import os
-import numpy as np
-from cconv import utils
-from collections import OrderedDict
 
 ## Default properties ##
 
@@ -297,7 +297,6 @@ def write_dat(seedname, data_curves, cwd='.'):
     columns = ['X', 'E', 'F', 'S']
 
     for xtype, xdata in data_curves.items():
-
         data = [xdata['values']]
         if len(data[0]) == 0:
             # No data
@@ -309,9 +308,9 @@ def write_dat(seedname, data_curves, cwd='.'):
         data += [xdata['Ys'][y] for y in columns[1:]]
         data = np.array(data).T
 
-        np.savetxt(open(os.path.join(cwd,
-                                     '{0}_{1}_conv.dat'.format(seedname,
-                                                               xtype)), 'w'),
+        np.savetxt(os.path.join(cwd,
+                                '{0}_{1}_conv.dat'.format(seedname,
+                                                          xtype)),
                    data)
 
 

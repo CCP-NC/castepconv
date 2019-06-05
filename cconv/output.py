@@ -1,9 +1,5 @@
 #!/usr/bin/env python
 
-from collections import OrderedDict
-from cconv import utils
-import numpy as np
-import os
 """
 CASTEP convergence automation tool
 by Simone Sturniolo
@@ -18,6 +14,11 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
+
+import os
+import numpy as np
+from cconv import utils
+from collections import OrderedDict
 
 """Plotting functions"""
 

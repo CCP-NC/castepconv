@@ -36,7 +36,7 @@ from cconv import utils
 from cconv.io import parse_convfile, write_dat
 from cconv.plot import gp_plot
 
-__version__ = "2.0"
+__version__ = "2.0.1"
 
 __intromsg__ = """
 CASTEPconv v. {version}
@@ -511,7 +511,10 @@ def main(seedname, cmdline_task):
 
     pname = '{0}.param'.format(seedname)
     print('Reading ' + pname)
-    read_param(pname, calc=cfile.calc)
+    try:
+        read_param(pname, calc=cfile.calc)
+    except FileNotFoundError:
+        print('File {0} not found, skipping'.format(pname))
 
     print('')
 

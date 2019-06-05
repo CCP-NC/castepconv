@@ -32,6 +32,10 @@ def parsestr(v):
     return str(v).lower().strip()
 
 
+def parsepath(v):
+    return str(v).strip()
+
+
 class ConvPar(object):
     """A definition of a convergence parameter"""
 
@@ -87,12 +91,11 @@ _conv_parameters = {
                            validoptions=['gnuplot', 'grace']),
     'fine_gmax_mode': ConvPar('fine_gmax_mode', 'fgmmode', parsestr,
                               validoptions=['min', 'max']),
-    # The following must be taken without any modification, so we don't use
-    # parsestr
-    'running_command': ConvPar('running_command', 'rcmd', str,
+    # The following are case sensitive, so we don't use parsestr
+    'running_command': ConvPar('running_command', 'rcmd', parsepath,
                                'castep <seedname> -dryrun'),
-    'dryrun_command': ConvPar('dryrun_command', 'drcmd', str),
-    'submission_script': ConvPar('submission_script', 'subs', str),
+    'dryrun_command': ConvPar('dryrun_command', 'drcmd', parsepath),
+    'submission_script': ConvPar('submission_script', 'subs', parsepath),
     # Float parameters
     #   eV
     'cutoff_min': ConvPar('cutoff_min', 'cutmin', float, 400.0,
@@ -128,10 +131,12 @@ _conv_parameters = {
     'max_parallel_jobs': ConvPar('max_parallel_jobs', 'maxjobs', int, 0,
                                  validrange=[-1, None]),
     # Boolean parameters
+    'job_wait': ConvPar('job_wait', 'jwait', parsebool, True),
     'converge_stress': ConvPar('converge_stress', 'cnvstr', parsebool, False),
     'reuse_calcs': ConvPar('reuse_calcs', 'rcalc', parsebool, False),
     'serial_reuse': ConvPar('serial_reuse', 'sruse', parsebool, True),
-    'castep_8plus': ConvPar('castep_8plus', 'c8plus', parsebool, True)
+    'castep_8plus': ConvPar('castep_8plus', 'c8plus', parsebool, True),
+    'include_gamma': ConvPar('include_gamma', 'gamma', parsebool, False)
 }
 
 
@@ -211,26 +216,3 @@ def parse_convfile(cfile=''):
     param_check(params)
 
     return params
-
-
-def write_dat(seedname, data_curves, cwd='.'):
-
-    columns = ['X', 'E', 'F', 'S']
-
-    for xtype, xdata in data_curves.items():
-
-        data = [xdata['values']]
-        if len(data[0]) == 0:
-            # No data
-            continue
-
-        if xtype == 'kpn':
-            data = [np.prod(xdata['values'], axis=1)]
-
-        data += [xdata['Ys'][y] for y in columns[1:]]
-        data = np.array(data).T
-
-        np.savetxt(open(os.path.join(cwd,
-                                     '{0}_{1}_conv.dat'.format(seedname,
-                                                               xtype)), 'w'),
-                   data)

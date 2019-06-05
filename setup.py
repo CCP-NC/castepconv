@@ -1,10 +1,22 @@
 #!/usr/bin/python
 
-from distutils.core import setup
 from castepconv import __version__
+from setuptools import setup, find_packages
 
-setup(name='castepconv',
-    version=__version__,
-    packages = ['cconv'],
-    scripts=['castepconv.py'],
-    )
+if __name__ == "__main__":
+
+    setup(name='CastepConv',
+          version=__version__,
+          description='A tool to automate convergence with CASTEP',
+          url='https://github.com/CCP-NC/castepconv',
+          author='Simone Sturniolo',
+          author_email='simone.sturniolo@stfc.ac.uk',
+          license='GPL',
+          packages=['cconv'],
+          scripts=['castepconv.py'],
+          install_requires=[
+              'numpy',
+              'ase'
+          ],
+          python_requires='>=2.6'
+          )

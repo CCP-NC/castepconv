@@ -18,5 +18,6 @@
 symmetry_generate
 
 %BLOCK SPECIES_POT
-Si	Si_C19_LDA_OTF.usp
 %ENDBLOCK SPECIES_POT
+
+kpoint_mp_offset 0.3 0.3 0.3

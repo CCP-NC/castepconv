@@ -15,7 +15,7 @@ from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
 
-"""Main script"""
+# Main script
 
 import os
 import sys
@@ -33,8 +33,8 @@ from ase.io.castep import (read_castep_cell, read_param, write_castep_cell,
                            write_param)
 
 from cconv import utils
-from cconv.io import parse_convfile, write_dat
-from cconv.plot import gp_plot
+from cconv.input import parse_convfile
+from cconv.output import gp_plot, agr_plot, write_dat, write_report
 
 __version__ = "2.0.1"
 
@@ -166,6 +166,8 @@ def add_castepopts(a, c8p=True):
     a.calc.cell._options['symmetry_generate'] = sgen
     kpmp = CastepOption('kpoints_mp_grid', 'B', 'integer vector', [1, 1, 1])
     a.calc.cell._options['kpoints_mp_grid'] = kpmp
+    kpoff = CastepOption('kpoints_mp_offset', 'B', 'real vector')
+    a.calc.cell._options['kpoints_mp_offset'] = kpoff
 
     if c8p:
         # This is only valid for Castep 8+
@@ -213,13 +215,15 @@ class Worktree(object):
     def __init__(self, basename, convpars, convranges):
 
         self._has_fgm = convranges['fgm']['values'][0] is not None
-        jobstr = 'cut_{cut}_kpn_{kpn}' + ('_fgm_{fgm}'
-                                          if self._has_fgm else '')
+        jobstr = '{base}_cut_{cut}_kpn_{kpn}' + ('_fgm_{fgm}'
+                                                 if self._has_fgm else '')
 
         self._reuse = convpars['rcalc']
-        self._sreuse = convpars['sruse']
         self._runmode = convpars['rmode']
+        self._sreuse = convpars['sruse'] and self._runmode == 'serial'
         self._maxjobs = convpars['maxjobs']
+        self._sscript = convpars['subs']
+        self._gamma = convpars['gamma']
 
         # The 'base' values for each structure (first of each range)
         self._basevals = OrderedDict()
@@ -230,7 +234,7 @@ class Worktree(object):
             self._baselabels[key] = crange['labels'][0]
 
         self._worktree = OrderedDict()
-        self._ranges = {}  # Store the jobs for each range
+        self._ranges = OrderedDict()  # Store the jobs for each range
 
         for key, crange in convranges.items():
 
@@ -247,7 +251,7 @@ class Worktree(object):
                 joblabels[key] = crange['labels'][v_i]
 
                 # Name?
-                jobname = jobstr.format(**joblabels)
+                jobname = jobstr.format(base=basename, **joblabels)
 
                 self._ranges[key].append(jobname)
 
@@ -282,6 +286,10 @@ class Worktree(object):
         def set_vals(a, cut, kpn, fgm):
             a.calc.param.cut_off_energy = cut
             a.calc.cell.kpoints_mp_grid = kpn
+            if self._gamma:
+                # Compute the necessary offset for the gamma point
+                offset = [0 if k%2 == 1 else 1.0/(2*k) for k in kpn]
+                a.calc.cell.kpoints_mp_offset = offset
             if fgm is not None:
                 a.calc.param.fine_gmax = fgm
 
@@ -302,6 +310,12 @@ class Worktree(object):
                 # If files exist and we shouldn't overwrite, skip
                 print('Reusing files for {0}'.format(job.seed))
                 continue
+
+            if self._sscript:
+                script = open(self._sscript).read()
+                script = script.replace('<seedname>', name)
+                with open(job.seed, 'w') as outf:
+                    outf.write(script)
 
             if self._sreuse:
                 a.calc.param.write_checkpoint = 'ALL'
@@ -342,6 +356,7 @@ class Worktree(object):
 
             end_i = -1
             try:
+                print(job.castep)
                 castlines = open(job.castep).readlines()
                 has_end = any(map(lambda l: endstr in l, castlines[-10:]))
             except IOError:
@@ -351,7 +366,7 @@ class Worktree(object):
 
         return complete
 
-    def run(self, castep_command='castep <seedname>'):
+    def run(self, castep_command='castep <seedname>', wait=True):
 
         # First, which ones are to run?
         to_run = self._worktree.keys()
@@ -368,7 +383,7 @@ class Worktree(object):
 
         # Now start running
         while len(to_run) > 0 or len(running) > 0:
-            if len(running) < maxjobs:
+            if len(running) < maxjobs and len(to_run) > 0:
                 # Push another!
                 name = to_run.pop(0)
                 job = self._worktree[name]
@@ -394,8 +409,9 @@ class Worktree(object):
                 print('Running job {0}...'.format(name))
                 sp.Popen(cmd_line, stdin=stdin, stdout=stdout, cwd=job.dir)
 
-                running.append(name)
-            else:
+                if wait:
+                    running.append(name)  # If not we're just launching all
+            elif wait:
                 # Wait for one to finish...
                 jobstate = self.check(running)
                 # Which ones are finished?
@@ -427,7 +443,7 @@ class Worktree(object):
         for name, job in self._worktree.items():
             if jobstate[name] != C_COMPLETE:
                 # Job isn't finished
-                jobdata[name] = None
+                utils.warn('Results for {0} missing, skipping.'.format(name))
                 continue
 
             ccalc = Castep(keyword_tolerance=3)
@@ -443,15 +459,17 @@ class Worktree(object):
         wtree = self._worktree
         data_curves = OrderedDict()
         for X, jobrange in self._ranges.items():
+            # Get an effective jobrange
+            jobcomplete = [j for j in jobrange if jobstate[j] == C_COMPLETE]
             data_curves[X] = {'values': np.array([wtree[j].values[X]
-                                                  for j in jobrange]),
+                                                  for j in jobcomplete]),
                               'labels': [wtree[j].labels[X]
-                                         for j in jobrange],
+                                         for j in jobcomplete],
                               'Ys': OrderedDict()
                               }
             for Y, data in jobdata.items():
                 data_curves[X]['Ys'][Y] = np.array([data[j]
-                                                    for j in jobrange])
+                                                    for j in jobcomplete])
 
         return data_curves
 
@@ -544,8 +562,13 @@ def main(seedname, cmdline_task):
     cfile.calc.param.calculate_stress = convpars['cnvstr']
 
     # Clean up all references to kpoints
-    for k in ('kpoints_mp_grid', 'kpoint_mp_grid', 'kpoints_mp_spacing',
-              'kpoint_mp_spacing', 'kpoints_list', 'kpoint_list'):
+    kclean = ['kpoints_mp_grid', 'kpoint_mp_grid', 'kpoints_mp_spacing',
+              'kpoint_mp_spacing', 'kpoints_list', 'kpoint_list']
+    # These, clean up only in the presence of the relevant option
+    if convpars['gamma']:
+        kclean += ['kpoints_mp_offset', 'kpoint_mp_offset']
+
+    for k in kclean:
         cfile.calc.cell.__setattr__(k, None)
 
     # Get the kpoint basis
@@ -598,18 +621,27 @@ def main(seedname, cmdline_task):
     ### PHASE 2: Running ###
     if task in ('inputrun', 'all'):
 
-        wtree.run(convpars['rcmd'])
+        # Not waiting only makes sense for inputrun
+        wait = convpars['jwait'] or (task == 'all')
+        wtree.run(convpars['rcmd'], wait)
 
     ### PHASE 3: Output processing ###
     if task in ('output', 'all'):
 
         data_curves = wtree.read_data()
 
+        print('Writing output to ' + basename + _out_dir)
+
         write_dat(basename, data_curves, basename + _out_dir)
 
-        print(data_curves)
+        write_report(basename, data_curves, convpars['nrgtol'],
+                     convpars['fortol'], convpars['strtol'],
+                     basename + _out_dir)
 
-        gp_plot(basename, data_curves, basename + _out_dir)
+        if convpars['outp'] == 'gnuplot':
+            gp_plot(basename, data_curves, basename + _out_dir)
+        elif convpars['outp'] == 'grace':
+            agr_plot(basename, data_curves, basename + _out_dir)
 
 
 if __name__ == '__main__':

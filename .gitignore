@@ -1,5 +1,10 @@
 syntax: glob
 
+# Latex leftovers
+*.aux
+*.log
+*.out
+
 example/Si_*
 example/Si.conv_tab
 

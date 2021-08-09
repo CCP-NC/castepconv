@@ -357,7 +357,7 @@ class Worktree(object):
             end_i = -1
             try:
                 castlines = open(job.castep).readlines()
-                has_end = any(map(lambda l: endstr in l, castlines[-10:]))
+                has_end = any(map(lambda l: endstr in l, castlines[-15:]))
             except IOError:
                 continue  # No castep file at all, it's C_READY
 
